@@ -30,6 +30,7 @@ let requestTokenURI = "https://api.twitter.com/oauth/request_token"
 let accessTokenURI = "https://api.twitter.com/oauth/access_token"
 let authorizeURI = "https://api.twitter.com/oauth/authorize"
 let verifyCredentialsURI = "https://api.twitter.com/1.1/account/verify_credentials.json"
+let searchURI = "https://api.twitter.com/1.1/search/tweets.json"
 
 // Utilities
 
@@ -245,3 +246,30 @@ let verifyCredentials() =
   let strm = resp.GetResponseStream()
   let text = (new StreamReader(strm)).ReadToEnd()
   text
+
+
+let searchTweets(q: string) =
+  let currSearchURI = searchURI+"?q="+q
+  let queryParameters =
+      ["oauth_version","1.0";
+       "oauth_consumer_key",s.consumerKey;
+       "oauth_nonce",System.Guid.NewGuid().ToString().Substring(24);
+       "oauth_signature_method","HMAC-SHA1";
+       "oauth_timestamp",currentUnixTime();
+       "oauth_token",s.accessToken ]
+  let signingString = baseString "GET" searchURI (queryParameters @ [("q",q)])
+  let signingKey = compositeSigningKey s.consumerSecret s.accessTokenSecret
+  let oauth_signature = hmacsha1 signingKey signingString
+  let AuthorizationHeader = ("oauth_signature",oauth_signature) :: queryParameters |> createAuthorizeHeader
+  System.Net.ServicePointManager.Expect100Continue <- false
+  let req = WebRequest.Create(currSearchURI)
+  //req.AddOAuthHeader(s.accessToken, s.accessTokenSecret, [])
+  req.Headers.Add("Authorization",AuthorizationHeader)
+  req.Method <- "GET"
+  req.ContentType <- "application/x-www-form-urlencoded"
+  let resp = req.GetResponse()
+  let strm = resp.GetResponseStream()
+  let text = (new StreamReader(strm)).ReadToEnd()
+  text
+
+  // searchTweets "@fbmnds&since_id=329112435350966272&until=2013-05-01";;
