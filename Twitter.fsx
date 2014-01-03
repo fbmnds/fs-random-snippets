@@ -74,7 +74,7 @@ let currentUnixTime() =
   |> int64
   |> sprintf "%d"
 
-/// Request a token from LinkedIn and return:
+/// Request a token from Twitter and return:
 /// oauth_token, oauth_token_secret, oauth_callback_confirmed
 let requestToken() =
     let signingKey = compositeSigningKey s.consumerSecret ""
@@ -196,32 +196,46 @@ let getTweet ((oauth_token', oauth_token_secret'), pin) =
     let text = (new StreamReader(strm)).ReadToEnd()
     text
 
-let postTweet ((oauth_token', oauth_token_secret'), pin) =
-    // Test 2:
-    let oauth_token, oauth_token_secret = accessToken oauth_token' oauth_token_secret' pin
-    System.Net.ServicePointManager.Expect100Continue <- false
-    let statusUrl = "https://api.twitter.com/1.1/statuses/update.json"
-    let request = WebRequest.Create (statusUrl, Method="POST") :?> HttpWebRequest
-    let r = System.Random(10)
-    let tweet =
-        "F# scripted tweet +++ " + sprintf "%d" (r.Next())
-        |> urlEncode
-    request.AddOAuthHeader(oauth_token,oauth_token_secret,["status",tweet])
-    let bodyStream = request.GetRequestStream()
-    let bodyWriter = new StreamWriter(bodyStream)
-    bodyWriter.Write("status=" + tweet)
-    bodyWriter.Close()
-    let resp = request.GetResponse()
-    let strm = resp.GetResponseStream()
-    let text = (new StreamReader(strm)).ReadToEnd()
-    text
-
-
 // let parms = captureOAuth();;
 
 // getTweet (parms, "0824995");;
 
-// postTweet (parms, "8909517");;
+
+let postTweet (tweet: string option) =
+  let tweet_ = 
+    match tweet with
+    | Some tweet -> tweet  |> urlEncode
+    | _ -> "F# scripted tweet +++ " + sprintf "%d #10m" (System.Random(10).Next()) |> urlEncode
+  let tweetData = System.Text.Encoding.ASCII.GetBytes("status="+tweet_)
+  let statusUrl = "https://api.twitter.com/1.1/statuses/update.json"
+  let queryParameters =
+      ["oauth_version","1.0";
+       "oauth_consumer_key",s.consumerKey;
+       "oauth_nonce",System.Guid.NewGuid().ToString().Substring(24);
+       "oauth_signature_method","HMAC-SHA1";
+       "oauth_timestamp",currentUnixTime();
+       "oauth_token",s.accessToken ]
+  let signingString = baseString "POST" statusUrl ([("status",tweet_)] |> List.append queryParameters)
+  let signingKey = compositeSigningKey s.consumerSecret s.accessTokenSecret
+  let oauth_signature = hmacsha1 signingKey signingString
+  let AuthorizationHeader = ("oauth_signature",oauth_signature) :: queryParameters |> createAuthorizeHeader
+  System.Net.ServicePointManager.Expect100Continue <- false
+  let req = WebRequest.Create(statusUrl)
+  //req.AddOAuthHeader(s.accessToken, s.accessTokenSecret, [])
+  req.Headers.Add("Authorization",AuthorizationHeader)
+  req.Method <- "POST"
+  req.ContentType <- "application/x-www-form-urlencoded"
+  req.ContentLength <- (int64) tweetData.Length
+  use wstream = req.GetRequestStream() 
+  wstream.Write(tweetData,0, (tweetData.Length))
+  wstream.Flush()
+  wstream.Close()
+  req.Timeout <- 3 * 60 * 1000
+  use resp = req.GetResponse()
+  use strm = resp.GetResponseStream()
+  let text = (new StreamReader(strm)).ReadToEnd()
+  text
+
 
 
 let verifyCredentials() =
