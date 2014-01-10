@@ -7,11 +7,11 @@ open System.Net
 open System.Security.Cryptography
 open System.Text
 
-#r @"C:\Program Files\Common Files\Microsoft Shared\Visual Studio\12.0\Newtonsoft.Json.dll"
-open Newtonsoft.Json
-
 #r @"C:\Program Files\Common Files\Microsoft Shared\Visual Studio\12.0\FSharp.Data.dll"
 open FSharp.Data
+open FSharp.Data.Json
+open FSharp.Data.Json.Extensions
+
 
 // Twitter OAuth Constants
 
@@ -23,14 +23,19 @@ type Secret = { consumerKey : string;
 let secret =
     Environment.GetEnvironmentVariable("HOME") + @"\.ssh\secret.json"
     |> File.ReadAllText
+    |> JsonValue.Parse
 
-let s = JsonConvert.DeserializeObject<Secret> secret
+
+let s : Secret = { consumerKey = (secret?consumerKey).AsString()
+                   consumerSecret = (secret?consumerSecret).AsString()
+                   accessToken = (secret?accessToken).AsString()
+                   accessTokenSecret = (secret?accessTokenSecret).AsString() }
 
 let requestTokenURI = "https://api.twitter.com/oauth/request_token"
 let accessTokenURI = "https://api.twitter.com/oauth/access_token"
 let authorizeURI = "https://api.twitter.com/oauth/authorize"
 let verifyCredentialsURI = "https://api.twitter.com/1.1/account/verify_credentials.json"
-let searchURI = "https://api.twitter.com/1.1/search/tweets.json"
+let searchURI = "https://api.twitter.com/1.1/statuses/user_timeline.json"
 
 // Utilities
 
@@ -262,28 +267,66 @@ let verifyCredentials() =
   text
 
 
-let searchTweets(q: string) =
-  let currSearchURI = searchURI+"?q="+q
-  let queryParameters =
-      ["oauth_version","1.0";
-       "oauth_consumer_key",s.consumerKey;
-       "oauth_nonce",System.Guid.NewGuid().ToString().Substring(24);
-       "oauth_signature_method","HMAC-SHA1";
-       "oauth_timestamp",currentUnixTime();
-       "oauth_token",s.accessToken ]
-  let signingString = baseString "GET" searchURI (queryParameters @ [("q",q)])
-  let signingKey = compositeSigningKey s.consumerSecret s.accessTokenSecret
-  let oauth_signature = hmacsha1 signingKey signingString
-  let AuthorizationHeader = ("oauth_signature",oauth_signature) :: queryParameters |> createAuthorizeHeader
-  System.Net.ServicePointManager.Expect100Continue <- false
-  let req = WebRequest.Create(currSearchURI)
-  //req.AddOAuthHeader(s.accessToken, s.accessTokenSecret, [])
-  req.Headers.Add("Authorization",AuthorizationHeader)
-  req.Method <- "GET"
-  req.ContentType <- "application/x-www-form-urlencoded"
-  let resp = req.GetResponse()
-  let strm = resp.GetResponseStream()
-  let text = (new StreamReader(strm)).ReadToEnd()
-  text
+let searchTweets searchParams =
+    try
+      let q = (searchParams |> Seq.map (fun (k,v) -> k+"="+v) |> String.concat "&")
+      let currSearchURI = searchURI+"?"+q
+      let queryParameters =
+          ["oauth_version","1.0";
+           "oauth_consumer_key",s.consumerKey;
+           "oauth_nonce",System.Guid.NewGuid().ToString().Substring(24);
+           "oauth_signature_method","HMAC-SHA1";
+           "oauth_timestamp",currentUnixTime();
+           "oauth_token",s.accessToken ]
+      let signingString = baseString "GET" searchURI (queryParameters @ searchParams)
+      let signingKey = compositeSigningKey s.consumerSecret s.accessTokenSecret
+      let oauth_signature = hmacsha1 signingKey signingString
+      let AuthorizationHeader = ("oauth_signature",oauth_signature) :: queryParameters |> createAuthorizeHeader
+      System.Net.ServicePointManager.Expect100Continue <- false
+      let req = WebRequest.Create(currSearchURI)
+      //req.AddOAuthHeader(s.accessToken, s.accessTokenSecret, [])
+      req.Headers.Add("Authorization",AuthorizationHeader)
+      req.Method <- "GET"
+      req.ContentType <- "application/x-www-form-urlencoded"
+      let resp = req.GetResponse()
+      let strm = resp.GetResponseStream()
+      let text = (new StreamReader(strm)).ReadToEnd()
+      Some ("{\"statuses\":"+text+"}")
+    with
+    | _ -> None
 
-  // searchTweets "@fbmnds&since_id=329112435350966272&until=2013-05-01";;
+  // searchTweets "@fbmnds";;
+
+let getMinId (searchResult: string option) : string option =
+    let getMinId_ (sR: string option) = 
+        try 
+            let r = (JsonValue.Parse sR.Value)
+            let s = seq { for i in r.GetProperty("statuses") do yield (i?id) }
+            s
+            |> Seq.min
+            |> string
+            |> Some
+        with 
+        | _ -> None 
+    match searchResult with 
+    | Some searchresult -> getMinId_ searchResult
+    | _ -> None
+
+
+let getAllTweets (q: string) = 
+    let nextTweets q (min_id: string option) : string option = 
+        match min_id with 
+        | Some min_id -> ([("screen_name",q); ("max_id",min_id)] |> searchTweets)
+        | _ -> None
+    let rec getRestTweets q minId acc =
+        System.Threading.Thread.Sleep(3000)
+        let n = nextTweets q minId
+        printfn "minId = %A n = %A" minId n
+        match n, acc with 
+        | None, _ -> acc
+        | _, head :: tail when n.Value = head -> acc
+        | _, _ -> getRestTweets q (getMinId n) (n.Value :: acc)
+    let f = searchTweets [("screen_name",q)]
+    getRestTweets q (getMinId f) [f.Value]
+
+// getAllTweets "@fbmnds";;
