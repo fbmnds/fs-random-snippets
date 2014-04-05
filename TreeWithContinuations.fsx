@@ -99,3 +99,22 @@ sumTreeCont2 tree id
 //    rightSum 5; cont leftSum+rightSum 15
 //    rightSum 9; cont leftSum+rightSum 15
 //    val it : int = 15
+
+
+type T = int
+
+
+type Arg =
+    | Leaf of T
+    | Node of T*T
+
+
+let c (x: Arg) (f1: T -> Arg) (f2: T -> T -> Arg) =
+    let res = 
+        match x with
+        | Leaf x -> f1 x
+        | Node (x,y) -> f2 x y
+    res
+
+let tree2 : Arg = Node (Node (Node ( Leaf (1), Leaf(2)), Leaf(3)), Node ( Leaf(4), Leaf(5) ) )
+let res = c tree2 (fun x -> Arg.Leaf x) (fun Arg.Node (x,y) -> x + y)

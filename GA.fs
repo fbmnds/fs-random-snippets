@@ -8,7 +8,8 @@
 //
 // let myPopulation = Population lociFunction 50 10
 //
-// let myEvolve population = Evolve population RankSelection ShuffleCrossover fitnessF 0.9 0.1
+// let elitism = true
+// let myEvolve population = Evolve population RankSelection ShuffleCrossover fitnessF 0.9 0.1 elitism
 //
 // let result = composite myEvolve 75 myPopulation 
 // 
