@@ -4,7 +4,7 @@
 //
 // let lociFunction() = box(random.Next(10))
 // let fitnessF (items:obj list) = 
-// items | > Seq.map (System.Convert.ToInt32) | > Seq.sum
+//     items |> Seq.map (System.Convert.ToInt32) |> Seq.sum
 //
 // let myPopulation = Population lociFunction 50 10
 //
