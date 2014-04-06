@@ -1,3 +1,9 @@
+/// Real World Functional Programming, T. Petricek, J. Skeet
+/// 13.3 "Exploring and obtaining the data"
+
+/// updates on the World Bank data API
+/// some minor error corrections
+
 open System.Web
 open System.IO
 open System.Net
@@ -9,7 +15,7 @@ let downloadUrl (url: string) = async {
     use response = response
     let stream = response.GetResponseStream ()
     use reader = new StreamReader (stream)
-    return!  reader.AsyncReadToEnd() }
+    return!  reader.AsyncReadToEnd() (* method extension via FSharp.PowerPack *) }
 
 let worldBankUrl (functions, props) =
     seq { yield "http://api.worldbank.org"
@@ -44,6 +50,8 @@ open System.Xml.Linq
 // hard coded document namespace
 let wb = "http://www.worldbank.org"
 
+/// unsafe helper functions, should rely on option values
+
 let xattr s (el:XElement) = el.Attribute(XName.Get(s)).Value
 
 let xelem s (el:XContainer) = el.Element((XName.Get(s,wb)))
@@ -61,11 +69,13 @@ let xnested path (el:XContainer) =
 
 let c = pages |> XDocument.Parse |> xnested ["countries";"country"] 
 
-c |> xelem "region" |> xvalue
+let prn = printfn "%s"
 
-c |> xelem "incomeLevel" |> xattr "id"
+c |> xelem "region" |> xvalue |> prn
 
-c |> xelem "region" |> xattr "id"
+c |> xelem "incomeLevel" |> xattr "id" |> prn
 
-/// System.NullReferenceException, if attribute not exists
-/// c |> xelem "iso2Code" |> xattr "id"
+c |> xelem "region" |> xattr "id" |> prn
+
+/// System.NullReferenceException, if attribute does not exist:
+(try c |> xelem "iso2Code" |> xattr "id" with | ex -> "NullReferenceException: " + ex.Message) |> prn
