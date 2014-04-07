@@ -1,4 +1,7 @@
-﻿// Usage:
+﻿/// Based on Tao Liu´s code
+/// http://apollo13cn.blogspot.de/2011/04/f-and-genetic-algorithms.html
+
+// Usage:
 // 
 // open EvolutionaryComputation
 //
