@@ -172,8 +172,6 @@ let populationSize = 50
 let chromosomeSize = 10
 let myPopulation = Population<int,int> lociFunction fitnessF id populationSize chromosomeSize
 
-for i in myPopulation do printfn "%A" (i.ToRows())
-
 let elitism = true
 let selectionF (x: ChromosomeType<int,int> list) = RankSelection<int,int> x
 let shuffleCrossover x y = ShuffleCrossover<int,int> x y
@@ -183,8 +181,80 @@ let mutationRate = 0.1
 let evolve (x: ChromosomeType<int,int> list) = 
     Evolve<int,int>(x, selectionF, shuffleCrossover, crossoverRate, mutationRate, elitism)
 
-let result = composite evolve 75 myPopulation
-printfn "%A" (maxFitness result)
 
-System.Console.ReadLine() |> ignore
 
+module Drawing =
+    open System.Drawing
+    open System.Windows.Forms
+
+    //let Red = Color.Red
+    //let Green = Color.Green
+    //let Blue = Color.Blue
+
+    let drawRectangle (gr: Graphics) clr x1 y1 x2 y2 =
+        use br = new SolidBrush(clr)
+        use pen = new Pen(br)
+        let left, top = min x1 x2, min y1 y2
+        let width, height = abs(x1 - x2), abs(y1 - y2)
+        gr.DrawRectangle(pen, Rectangle(left, top, width, height))
+        gr.FillRectangle(br, Rectangle(left, top, width, height)) 
+       
+    let defaultColorTable i_ =
+        let i = i_ % 10
+        match i with
+        | 0 -> Color.SpringGreen
+        | 1 -> Color.Lime
+        | 2 -> Color.Chartreuse
+        | 3 -> Color.GreenYellow
+        | 4 -> Color.Yellow
+        | 5 -> Color.Gold
+        | 6 -> Color.Orange
+        | 7 -> Color.DarkOrange
+        | 8 -> Color.OrangeRed
+        | _ -> Color.Red
+        
+    let heatMap (form:Form) colorTable dimX dimY size (matrix: (int list) list) =
+        use gr = form.CreateGraphics()
+        let drawElement x i j = 
+            let color = colorTable x
+            drawRectangle gr color (i*size) (j*size) ((i+1)*size) ((j+1)*size) 
+        matrix 
+        |> List.iteri (fun i row -> row |> List.iteri (fun j x -> drawElement x i j))
+
+        
+open System.Drawing
+open System.Windows.Forms
+
+let dimX = 50
+let dimY = 10
+let size = 20
+
+let form = new Form(ClientSize=Size(dimX*size, dimY*size))
+form.Show()
+
+let colorTable i = Drawing.defaultColorTable i
+
+let generations x = 
+    let rec doEvolve pop acc x = 
+        if x > 0 then
+            let tail = (evolve pop)
+            doEvolve tail (acc @ [tail]) (x-1)
+        else acc
+    doEvolve myPopulation [] x
+    
+let history = generations 75
+
+printfn "max. fitness of the original population: %A" (maxFitness<int,int> history.Head)
+let lastPopulation = history |> List.rev |> List.head
+printfn "max. fitness of the resulting population: %A" (maxFitness<int,int> lastPopulation)
+
+
+let mutable repeat = true
+let yes = ["y"; "Y"; "j"; "J"] |> Set.ofList
+while repeat do
+    for h in history do
+        [for x in h do yield x.Genos; yield x.Pheno]
+        |> Drawing.heatMap form colorTable dimX dimY size
+        form.ResetForeColor()
+    System.Console.WriteLine "repeat? "
+    repeat <- yes.Contains(System.Console.ReadLine())
