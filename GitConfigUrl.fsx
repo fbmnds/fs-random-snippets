@@ -1,3 +1,5 @@
+/// Switch the Git configuration of all own projects in the user´s master directory from http[s] to git access
+
 open System
 open System.IO
 open System.Text.RegularExpressions
@@ -26,41 +28,62 @@ let (|CompiledMatch|_|) pattern input =
         if m.Success then Some [for x in m.Groups -> x]
         else None
 
-let (|GitUrl|) (s: string) = (|CompiledMatch|_|) @"(?<spaces>\s*)url\s+=\s+http[s]{0,1}://github.com/fbmnds/(?<repo>.*)" s
     
-
-let rec allFiles dir =
+/// get all .git/config files
+let rec allGitConfigFiles dir =
     try 
         match (matchGitDir (new DirectoryInfo (dir))) with
         | Some text -> [ for sub in Directory.GetDirectories dir do
-                            yield! allFiles sub ]
+                            yield! allGitConfigFiles sub ]
         | _ -> [ for file in Directory.GetFiles dir do
                     match (matchGitConfig (new FileInfo (file))) with
                     | Some text -> yield text
                     | _ -> ignore "null"
                  for sub in Directory.GetDirectories dir do
-                    yield! allFiles sub ]
+                    yield! allGitConfigFiles sub ]
     with | _ -> []
 
-// Environment.SetEnvironmentVariable("PROJECTS", @"D:\projects")
-let gitdir = Environment.GetEnvironmentVariable("PROJECTS")
 
-let gitConfigFiles = allFiles gitdir
+/// match, if the user´s repo is addressed by a http[s] url 
+let (|GitUrl|) gitUser s =
+    (|CompiledMatch|_|) (@"(?<spaces>\s*)url\s+=\s+http[s]{0,1}://github.com/" + gitUser + "/(?<repo>.*)") s
 
-let setGitUrl (fullname:string) =
-    try   
-        let out = [ for c in (File.ReadLines fullname) do
-                    printfn "%A" ((|GitUrl|) c)
-                    match ((|GitUrl|) c) with
-                    | Some [_;spaces;repo] -> 
-                        yield spaces.Value + "url = git@github.com:fbmnds/" + repo.Value + ".git"
-                    | _ -> yield c ]
-        //Async.RunSynchronously( out )
-        printfn "%A" out
-        use outStream = new StreamWriter(fullname+"-copied.txt")
-        out |> outStream.WriteLine |> ignore
-        outStream.Close() 
-    with | ex -> ignore ex
 
-setGitUrl gitConfigFiles.Head
-setGitUrl @"D:\projects\dfa\.git\config"
+/// return a tuple of fullname and modified config
+let modifyGitUrl gitUser (fullname:string) = 
+    async { 
+        /// read the file in one go in order to keep the file line sequence
+        return (fullname, 
+            try
+                [ for c in (File.ReadLines fullname) do
+                            match ((|GitUrl|) gitUser c) with
+                            | Some [_;spaces;repo] -> 
+                                yield spaces.Value + "url = git@github.com:" + gitUser + "/" + repo.Value + ".git"
+                            | _ -> yield c ] 
+            with | _ -> []) } 
+
+
+/// write a modified config to disk using fullname
+let writeGitUrl ((fullname:string), (config: string list)) =
+    async { 
+        try
+            use outStream = new StreamWriter(fullname)
+            /// write the file in one go in order to keep the file line sequence
+            for c in config do outStream.WriteLine c
+            outStream.Close()
+        with | ex -> ignore ex
+     }
+
+
+///
+Environment.SetEnvironmentVariable("PROJECTS", @"D:\projects")
+let projectDir = Environment.GetEnvironmentVariable("PROJECTS")
+let gitUser = "fbmnds"
+
+/// pipe the config files through the task chain in 2 sequential steps:
+projectDir |> allGitConfigFiles 
+/// 1. pump all config files into main memory, modify them
+|> List.map (modifyGitUrl gitUser) |> Async.Parallel |> Async.RunSynchronously 
+/// 2. push the modified config files to disk
+|> Array.map writeGitUrl |> Async.Parallel |> Async.RunSynchronously
+ 
