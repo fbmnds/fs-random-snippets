@@ -49,34 +49,40 @@ let (|GitUrl|) gitUser s =
     (|CompiledMatch|_|) (@"(?<spaces>\s*)url\s+=\s+http[s]{0,1}://github.com/" + gitUser + "/(?<repo>.*)") s
 
 
-/// return a tuple of fullname and modified config
+/// return a tuple of fullname and modified config,
+///  mark unmodified files for being skipped by returning an empty result tuple;
+/// silently ignore errors
 let modifyGitUrl gitUser (fullname:string) = 
     async { 
+        let found = ref false 
         /// read the file in one go in order to keep the file line sequence
-        return (fullname, 
-            try
-                [ for c in (File.ReadLines fullname) do
-                            match ((|GitUrl|) gitUser c) with
-                            | Some [_;spaces;repo] -> 
-                                yield spaces.Value + "url = git@github.com:" + gitUser + "/" + repo.Value + ".git"
-                            | _ -> yield c ] 
-            with | _ -> []) } 
+        let res = 
+            try [ for c in (File.ReadLines fullname) do
+                    match ((|GitUrl|) gitUser c) with
+                    | Some [_;spaces;repo] -> 
+                        found := true
+                        yield spaces.Value + "url = git@github.com:" + gitUser + "/" + repo.Value + ".git"
+                    | _ -> yield c ] 
+            with | _ -> []  /// skip this file
+        return (if !found && res <> [] then (fullname, res) else ("", [])) } 
 
 
-/// write a modified config to disk using fullname
+/// write the modified config files to disk using fullname,
+/// silently ignore errors
 let writeGitUrl ((fullname:string), (config: string list)) =
     async { 
-        try
-            use outStream = new StreamWriter(fullname)
-            /// write the file in one go in order to keep the file line sequence
-            for c in config do outStream.WriteLine c
-            outStream.Close()
-        with | ex -> ignore ex
+        if fullname <> "" then
+            try
+                use outStream = new StreamWriter(fullname)
+                /// write the file in one go in order to keep the file line sequence
+                for c in config do outStream.WriteLine c
+                outStream.Close()
+            with | ex -> ignore ex
      }
 
 
 ///
-Environment.SetEnvironmentVariable("PROJECTS", @"D:\projects")
+Environment.SetEnvironmentVariable("PROJECTS", @"D:\projects-test")
 let projectDir = Environment.GetEnvironmentVariable("PROJECTS")
 let gitUser = "fbmnds"
 
