@@ -81,8 +81,7 @@ let writeGitUrl ((fullname:string), (config: string list)) =
      }
 
 
-///
-Environment.SetEnvironmentVariable("PROJECTS", @"D:\projects-test")
+/// Environment.SetEnvironmentVariable("PROJECTS", @"D:\projects-test")
 let projectDir = Environment.GetEnvironmentVariable("PROJECTS")
 let gitUser = "fbmnds"
 
