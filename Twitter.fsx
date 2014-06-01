@@ -1,4 +1,4 @@
-﻿// apdapted from http://blogs.msdn.com/b/lukeh/archive/2010/09/05/twitter-oauth-in-f.aspx, Luke Hoban
+﻿// adapted from http://blogs.msdn.com/b/lukeh/archive/2010/09/05/twitter-oauth-in-f.aspx, Luke Hoban
 // refer also to http://sergeytihon.wordpress.com/2012/07/22/linkedin-oauth-in-f/, Sergey Tihon
 
 open System
@@ -7,7 +7,7 @@ open System.Net
 open System.Security.Cryptography
 open System.Text
 
-#r @"C:\Program Files\Common Files\Microsoft Shared\Visual Studio\12.0\FSharp.Data.dll"
+#r @"FSharpData\FSharp.Data.dll"
 open FSharp.Data
 open FSharp.Data.Json
 open FSharp.Data.Json.Extensions
