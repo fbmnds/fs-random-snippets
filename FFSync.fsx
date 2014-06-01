@@ -93,35 +93,22 @@ module Utilities =
             [||]
 
 
-
-
-    type SyncKeyBundle = { encryption_key : byte[]; hmac_local : byte[] }
+    type SyncKeyBundle = { encryption_key : byte[]; hmac_key : byte[] }
 
     let syncKeyBundle username key =
         let info = "Sync-AES_256_CBC-HMAC256" + username
         let hmac256 = new HMACSHA256(key)
         let T1 = hmac256.ComputeHash (Array.append (info |> stringToBytes ) [| 1uy |] )
         let T2 = hmac256.ComputeHash (Array.append T1 <| Array.append (info |> stringToBytes) [| 2uy |])   
-        { encryption_key = T1 ; hmac_local = T2 }
-    
+        { encryption_key = T1 ; hmac_key = T2 }
 
-    // http://social.msdn.microsoft.com/Forums/en-US/aa51d82c-3868-4da8-b697-9a26926d0806/c-and-php-encryption-and-decryption-rijndaelaes-256?forum=csharplanguage
-    let DecryptIt (s : string) (key : byte[]) (iv : byte[]) =
-        let rijn = new RijndaelManaged()
-        rijn.Mode <- CipherMode.ECB
-        rijn.Padding <- PaddingMode.Zeros
-        use msDecrypt = new MemoryStream(Convert.FromBase64String(s))
-        use decryptor = rijn.CreateDecryptor(key, iv)
-        use csDecrypt = new CryptoStream(msDecrypt, decryptor, CryptoStreamMode.Read)
-        use swDecrypt = new StreamReader(csDecrypt)
-        let result = swDecrypt.ReadToEnd()
-        rijn.Clear()
-        result
 
     // http://msdn.microsoft.com/en-us/library/system.security.cryptography.aescryptoserviceprovider%28v=vs.110%29.aspx
     let DecryptAES (s : string) (key : byte[]) (iv : byte[]) =
         // Check arguments.
-        if s.Length * key.Length * iv.Length = 0 then ""
+        if s.Length * key.Length * iv.Length = 0 then 
+            printfn "%d %d %d" s.Length  key.Length  iv.Length
+            "*"
         else
             // Create an AesCryptoServiceProvider object 
             // with the specified key and IV. 
@@ -197,13 +184,9 @@ module ServerAPI =
         let url = (clusterURL username) + "1.1/" + username + "/storage/crypto/keys"
         fetchUrlResponse url "GET" (Some (username, password)) None None None
 
-
-    // decrypt payload
-    // https://docs.services.mozilla.com/sync/storageformat5.html
     type CryptoKeysPayload = { iv         : string
                                ciphertext : string
                                hmac       : string }
-
 
     let writeSecretKeysToDisk username password (file : string option) = 
         let secretKeys = fetchCryptoKeys username password
@@ -255,10 +238,10 @@ module Test =
     //    # Second round of HKDF
     //    hmac = HKDF-Expand(sync_key, encryption_key + info + "\x02", 32)
     //      -> 0xbf9e48ac50a2fcc400ae4d30a58dc6a83a7720c32f58c60fd9d02db16e406216
-    //
+    //                                                 
     let ff_skb' = syncKeyBundle "johndoe@example.com" ("Y4NKPS6YXAVI75XNUVODSR472I" |> base32Decode)
     let ff_skb'' = ( ff_skb'.encryption_key |> Array.map (sprintf "%x"), 
-                     ff_skb'.hmac_local |> Array.map (sprintf "%x"))
+                     ff_skb'.hmac_key |> Array.map (sprintf "%x"))
     let ff_skb''' = ([|"8d"; "7"; "65"; "43"; "e"; "a0"; "d9"; "db"; "d5"; "3c"; "53"; "6c";
                        "6c"; "5c"; "4c"; "b6"; "39"; "c0"; "93"; "7"; "5e"; "f2"; "bd"; "77";
                        "cd"; "30"; "cf"; "48"; "51"; "38"; "b9"; "5"|],
@@ -278,9 +261,30 @@ module Workflow =
     with | _ -> failwith "writeSecretKeysToDisk failed"
 
     let sk = readSecretKeysFromDisk None |> JsonValue.Parse
-    let sk_pl' = (sk?payload).AsString() |> JsonValue.Parse
+    let sk_pl = (sk?payload).AsString() |> JsonValue.Parse
 
-    let sk_pl = { iv         = (sk_pl'?IV).AsString()
-                  ciphertext = (sk_pl'?ciphertext).AsString()
-                  hmac       = (sk_pl'?hmac).AsString() }
+// https://docs.services.mozilla.com/sync/storageformat5.html
+//
+//    ciphertext  = record.ciphertext
+//    iv          = record.iv
+//    record_hmac = record.hmac
+//
+//    encryption_key = bundle.encryption_key
+//    hmac_key       = bundle.hmac_key
+//
+//    local_hmac = HMACSHA256(hmac_key, base64(ciphertext))
+//
+//    if local_hmac != record_hmac:
+//      throw Error("HMAC verification failed.")
+//
+//    cleartext = AESDecrypt(ciphertext, encryption_key, iv)
 
+    let record = { iv         = (sk_pl?IV).AsString()
+                   ciphertext = (sk_pl?ciphertext).AsString()
+                   hmac       = (sk_pl?hmac).AsString() }
+
+    let bundle = syncKeyBundle secrets.username (secrets.encryptionpassphrase |> base32Decode)
+
+    let local_hmac = record.ciphertext |> Convert.FromBase64String |> (new HMACSHA256(bundle.hmac_key)).ComputeHash
+
+    let cleartext = DecryptAES record.ciphertext bundle.encryption_key (record.iv |> Convert.FromBase64String)
