@@ -42,6 +42,12 @@ module Utilities =
     let bytesToString (b : byte[]) = b |> Array.map (char) |> fun cs -> new string(cs)
     let bytesToHex (b : byte[]) = b |> Array.map (sprintf "%x")
 
+    let removeChars (chars : string) (x : string) = 
+        let set = chars.ToCharArray() |> Set.ofArray
+        x.ToCharArray() |> Array.filter (fun x -> if set.Contains x then false else true) |> fun x -> new string (x)
+
+    let keepAsciiPrintableChars (x : string) =
+        x.ToCharArray() |> Array.filter (fun x -> if int x < 32 || int x > 126 then false else true) |> fun x -> new string (x)
     
     // Cryptography
 
@@ -106,14 +112,11 @@ module Utilities =
     // http://msdn.microsoft.com/en-us/library/system.security.cryptography.aescryptoserviceprovider%28v=vs.110%29.aspx
     let DecryptAES (s : string) (key : byte[]) (iv : byte[]) =
         // Check arguments.
-        if s.Length * key.Length * iv.Length = 0 then 
-            printfn "%d %d %d" s.Length  key.Length  iv.Length
-            "*"
+        if s.Length * key.Length * iv.Length = 0 then ""
         else
             // Create an AesCryptoServiceProvider object 
             // with the specified key and IV. 
             use aesAlg = new AesManaged()
-            printfn "%d" aesAlg.KeySize
 
             aesAlg.Key <- key
             aesAlg.IV <- iv
@@ -184,6 +187,8 @@ module ServerAPI =
         let url = (clusterURL username) + "1.1/" + username + "/storage/crypto/keys"
         fetchUrlResponse url "GET" (Some (username, password)) None None None
 
+
+
     type CryptoKeysPayload = { iv         : string
                                ciphertext : string
                                hmac       : string }
@@ -251,14 +256,17 @@ module Test =
     if ff_skb'' <> ff_skb''' then 
         failwith "syncKeyBundle failed"
 
-
-module Workflow =
-    open Secrets
-    open Utilities
+    
+    // writeSecretKeysToDisk
 
     try
         writeSecretKeysToDisk secrets.username secrets.password None
     with | _ -> failwith "writeSecretKeysToDisk failed"
+
+
+module CryptoKeys =
+    open Secrets
+    open Utilities
 
     let sk = readSecretKeysFromDisk None |> JsonValue.Parse
     let sk_pl = (sk?payload).AsString() |> JsonValue.Parse
@@ -268,23 +276,52 @@ module Workflow =
 //    ciphertext  = record.ciphertext
 //    iv          = record.iv
 //    record_hmac = record.hmac
+    let record = { iv         = (sk_pl?IV).AsString()
+                   ciphertext = (sk_pl?ciphertext).AsString()
+                   hmac       = (sk_pl?hmac).AsString() }
 //
 //    encryption_key = bundle.encryption_key
 //    hmac_key       = bundle.hmac_key
+    let bundle = syncKeyBundle secrets.username (secrets.encryptionpassphrase |> base32Decode)
 //
 //    local_hmac = HMACSHA256(hmac_key, base64(ciphertext))
+    let local_hmac = record.ciphertext |> Convert.FromBase64String |> (new HMACSHA256(bundle.hmac_key)).ComputeHash
 //
 //    if local_hmac != record_hmac:
 //      throw Error("HMAC verification failed.")
 //
 //    cleartext = AESDecrypt(ciphertext, encryption_key, iv)
-
-    let record = { iv         = (sk_pl?IV).AsString()
-                   ciphertext = (sk_pl?ciphertext).AsString()
-                   hmac       = (sk_pl?hmac).AsString() }
-
-    let bundle = syncKeyBundle secrets.username (secrets.encryptionpassphrase |> base32Decode)
-
-    let local_hmac = record.ciphertext |> Convert.FromBase64String |> (new HMACSHA256(bundle.hmac_key)).ComputeHash
-
     let cleartext = DecryptAES record.ciphertext bundle.encryption_key (record.iv |> Convert.FromBase64String)
+
+module Collections =
+
+    let s = Secrets.secrets
+    let url = clusterURL s.username
+    
+    // https://github.com/mikerowehl/firefox-sync-client-php/blob/master/sync.php#L94
+    let fetchCollection username password collection =
+        let url = (clusterURL username) + "1.1/" + username + "/storage/" + collection + "?full=1"
+        fetchUrlResponse url "GET" (Some (username, password)) None None None
+
+    let bm' = fetchCollection s.username s.password "bookmarks"
+
+    let parseCollection collection = 
+        collection
+        |> JsonValue.Parse 
+        |> fun x -> x.AsArray() 
+        |> Array.map string 
+        |> Array.map (fun x -> JsonValue.Parse x) 
+        |> Array.map (fun x -> (x?payload).AsString())
+        |> Array.map (fun x -> JsonValue.Parse x)
+        |> Array.map (fun x -> { iv = x?IV.AsString(); ciphertext = x?ciphertext.AsString(); hmac = x?hmac.AsString() } )
+
+    let bm = parseCollection bm'
+    let key = 
+        CryptoKeys.cleartext 
+        |> keepAsciiPrintableChars
+        |> JsonValue.Parse 
+        |> fun x -> (x.GetProperty "default").AsArray()
+        |> fun x -> x.[0].AsString()
+        |> Convert.FromBase64String
+    let cleartext = [|for b in bm do yield DecryptAES b.ciphertext key (b.iv |> Convert.FromBase64String) |]
+ 
