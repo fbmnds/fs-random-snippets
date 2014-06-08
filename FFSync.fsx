@@ -29,6 +29,83 @@ module Secrets =
                              password = (secrets'?password).AsString()
                              encryptionpassphrase = (secrets'?encryptionpassphrase).AsString() }
 
+
+// http://docs.services.mozilla.com/sync/objectformats.html
+// Firefox Object Formats
+[<AutoOpen>]
+module ObjectFormats = 
+    
+    type Addons = { addonID       : string;
+                    applicationID : string;
+                    enabled       : Boolean;
+                    source        : string }
+
+    type Bookmark = { id            : string;
+                      ``type``      : string;
+                      title         : string;
+                      parentName    : string;
+                      bmkUri        : string;
+                      tags          : string [];
+                      keyword       : string option;
+                      description   : string option;
+                      loadInSidebar : Boolean;
+                      parentid      : string }
+
+    type Microsummary = { generatorUri  : string;
+                          staticTitle   : string;
+                          title         : string;
+                          bmkUri        : string;
+                          description   : string;
+                          loadInSidebar : Boolean;
+                          tags          : string [];
+                          keyword       : string;
+                          parentid      : string;
+                          parentName    : string;
+                          predecessorid : string;
+                          ``type``      : string }
+
+    type Query = { folderName    : string
+                   queryId       : string option;
+                   title         : string;
+                   bmkUri        : string;
+                   description   : string;
+                   loadInSidebar : Boolean;
+                   tags          : string [];
+                   keyword       : string;
+                   parentid      : string;
+                   parentName    : string;
+                   predecessorid : string;
+                   ``type``      : string }
+
+    type Folder = { title : string;
+                    parentid : string;
+                    parentName : string;
+                    predecessorid : string;
+                    ``type`` : string }
+
+    type Livemark = { siteUri : string;
+                      feedUri : string;
+                      title : string;
+                      parentid : string;
+                      parentName : string;
+                      predecessorid : string;
+                      ``type`` : string }
+
+    type Separator = { pos : string;
+                       parentid : string;
+                       parentName : string;
+                       predecessorid : string;
+                       ``type`` : string; 
+                       children : string [] }
+
+    type Clients = { name : string;
+                     ``type`` : string;
+                     commands : string [];
+                     version : string option;
+                     protocols : string [] option }
+
+    type ClientsPayload = {  }
+
 // Utilities
 [<AutoOpen>]
 module Utilities = 
@@ -294,6 +371,8 @@ module CryptoKeys =
     let cleartext = DecryptAES record.ciphertext bundle.encryption_key (record.iv |> Convert.FromBase64String)
 
 module Collections =
+    open Secrets
+    open ServerAPI
 
     let s = Secrets.secrets
     let url = clusterURL s.username
@@ -324,4 +403,19 @@ module Collections =
         |> fun x -> x.[0].AsString()
         |> Convert.FromBase64String
     let cleartext = [|for b in bm do yield DecryptAES b.ciphertext key (b.iv |> Convert.FromBase64String) |]
- 
+
+
+    let cleartext' = 
+        cleartext
+        |> Array.map keepAsciiPrintableChars 
+        |> Array.map JsonValue.Parse
+
+    let x = 
+        cleartext'.[0] 
+        |> fun x -> x.TryGetProperty "keyword"
+        |> fun x -> match x with | Some x -> x.AsString() | _ -> ""
+
+    let x' = 
+        cleartext'.[0] 
+        |> fun x -> x.TryGetProperty "parentName"
+        |> fun x -> match x with | Some x -> x.AsString() | _ -> ""
