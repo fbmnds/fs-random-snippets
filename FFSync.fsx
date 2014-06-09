@@ -1,9 +1,14 @@
 
-// TODO Topics
-// -----------
+// TODO
+// ----
+// railway oriented programming, consistent error/exception handling
+// better types (e.g. GUID, URL)
+// proper testing
+// complete functionality
 // parallel tasks
 // secure password store (PasswordVault?)
 // secure in memory strings (IBuffer?)
+// make Library
 
 open System
 open System.IO
@@ -29,16 +34,17 @@ module DataSignatures =
                     enabled       : Boolean;
                     source        : string }
 
-    type Bookmark = { id            : string;
-                      ``type``      : string;
-                      title         : string;
-                      parentName    : string;
-                      bmkUri        : string;
-                      tags          : string [];
-                      keyword       : string option;
-                      description   : string option;
-                      loadInSidebar : Boolean;
-                      parentid      : string }
+    type Bookmarks = { id            : string;
+                       ``type``      : string;
+                       title         : string;
+                       parentName    : string;
+                       bmkUri        : string;
+                       tags          : string [];
+                       keyword       : string;
+                       description   : string;
+                       loadInSidebar : Boolean;
+                       parentid      : string;
+                       children      : string [] }
 
     type Microsummary = { generatorUri  : string;
                           staticTitle   : string;
@@ -54,7 +60,7 @@ module DataSignatures =
                           ``type``      : string }
 
     type Query = { folderName    : string
-                   queryId       : string option;
+                   queryId       : string;
                    title         : string;
                    bmkUri        : string;
                    description   : string;
@@ -90,25 +96,21 @@ module DataSignatures =
     type Clients = { name      : string;
                      ``type``  : string;
                      commands  : string [];
-                     version   : string option;
-                     protocols : string [] option }
-
-    type ClientsPayloadCapabilities = string
+                     version   : string;
+                     protocols : string [] }
 
     type ClientsPayload = { name         : string;
                             formfactor   : string;
                             application  : string;
                             version      : string;
-                            capabilities : ClientsPayloadCapabilities;
+                            capabilities : string;
                             mpEnabled    : Boolean }
-
-    type CommandsData = string
 
     type Commands = { receiverID : string;
                       senderID   : string;
                       created    : Int64;
                       action     : string;
-                      data       : CommandsData }
+                      data       : string }
 
     type Forms =  { name :  string;
                     value : string }
@@ -127,7 +129,7 @@ module DataSignatures =
                                   title  : string;
                                   visits : string [] }
 
-    type HistoryPayload = { items : HistoryPayloadVisits }
+    type HistoryPayload = { items : HistoryPayloadVisits [] }
 
     type History = { histUri  : string;
                      title    : string;
@@ -144,8 +146,8 @@ module DataSignatures =
                        passwordField : string }
 
     type Preferences = { value    : string;
-                         name     : string option;
-                         ``type`` : string option }
+                         name     : string;
+                         ``type`` : string }
 
     module TabsVersions =
         
@@ -181,13 +183,14 @@ module DataSignatures =
 
     // CryptoKeys
 
-    type SyncKeyBundle = { encryption_key : byte[]; hmac_key : byte[] }
+    type SyncKeyBundle = { encryption_key : byte[]; 
+                           hmac_key       : byte[] }
 
     type EncryptedCollection = { iv         : string
                                  ciphertext : string
                                  hmac       : string }
 
-    type CryptoKeys = { ``default`` : byte [] [] option }
+    type CryptoKeys = { ``default`` : byte [] [] }
 
 
 
@@ -219,6 +222,31 @@ module Secrets =
 // Utilities
 [<AutoOpen>]
 module Utilities = 
+    
+    // JSON
+
+    let tryGetString (jsonvalue : JsonValue) property = 
+        try 
+            property 
+            |> jsonvalue.TryGetProperty 
+            |> fun x -> match x with | Some x -> x.AsString() | _ -> ""
+            |> fun x -> if x = null then "" else x
+        with | _ -> ""
+
+    let tryGetBoolean (jsonvalue : JsonValue) defaultboolean property  = 
+        try
+            property 
+            |> jsonvalue.TryGetProperty 
+            |> fun x -> match x with | Some x -> x.AsBoolean() | _ -> defaultboolean
+        with | _ -> defaultboolean
+
+    let tryGetArray (jsonvalue : JsonValue) property = 
+        try
+            property 
+            |> jsonvalue.TryGetProperty 
+            |> fun x -> match x with | Some x -> x.AsArray() | _ -> [||]
+            |> fun x -> if x = null then [||] else x 
+        with | _ -> [||]
     
     // Misc.
 
@@ -451,10 +479,9 @@ module CryptoKeys =
                 |> JsonValue.Parse 
                 |> fun x -> (x.GetProperty "default").AsArray()
                 |> Array.map (fun x -> x.AsString())
-                |> Array.map Convert.FromBase64String
-                |> Some }
+                |> Array.map Convert.FromBase64String }
         with 
-        | _ -> { ``default`` = None }
+        | _ -> { ``default`` = [||] }
                 
 
     let getCryptoKeys secrets =
@@ -462,7 +489,7 @@ module CryptoKeys =
             fetchCryptoKeys secrets.username secrets.password
             |> getCryptoKeysFromString secrets
         with 
-        | _ -> { ``default`` = None }
+        | _ -> { ``default`` = [||] }
 
     
     let getCryptokeysFromDisk secrets file =
@@ -470,7 +497,7 @@ module CryptoKeys =
             readCryptoKeysFromDisk file
             |> getCryptoKeysFromString secrets
         with 
-        | _ -> { ``default`` = None }
+        | _ -> { ``default`` = [||] }
 
 
 
@@ -527,8 +554,8 @@ module Collections =
 
     let getFirstCryptoKey (cryptokeys : CryptoKeys) = 
         match cryptokeys.``default`` with
-        | Some x -> x.[0]
-        | _ -> [||]
+        | [||] -> [||]
+        | _ as x -> x.[0]
 
 
     let decryptCollectionArray cryptokeys collection = 
@@ -545,8 +572,42 @@ module Collections =
             |> fetchFullCollection secrets.username secrets.password 
             |> parseEncryptedCollectionArray
             |> decryptCollectionArray cryptokeys
+        with | _ -> [||]       
+
+
+    let getBookmarks secrets cryptokeys =
+        let parseBookmark bm = 
+            { id            = "id" |> tryGetString bm
+              ``type``      = "type" |> tryGetString bm
+              title         = "title" |> tryGetString bm
+              parentName    = "parentName" |> tryGetString bm
+              bmkUri        = "bmkUri" |> tryGetString bm
+              tags          = "tags" |> tryGetArray bm |> Array.map (fun x -> x.AsString())
+              keyword       = "keyword" |> tryGetString bm
+              description   = "description" |> tryGetString bm
+              loadInSidebar = "loadInSidebar" |> tryGetBoolean bm false
+              parentid      = "parentid" |> tryGetString bm 
+              children      = "children" |> tryGetArray bm |> Array.map (fun x -> x.AsString()) }
+        try 
+            "bookmarks" 
+            |> getDecryptedCollection secrets cryptokeys
+            |> Array.map JsonValue.Parse
+            |> Array.map parseBookmark
         with | _ -> [||]
 
+    // Bookmarks
+
+
+//    type Bookmark = { id            : string;
+//                      ``type``      : string;
+//                      title         : string;
+//                      parentName    : string;
+//                      bmkUri        : string;
+//                      tags          : string [];
+//                      keyword       : string option;
+//                      description   : string option;
+//                      loadInSidebar : Boolean;
+//                      parentid      : string }
 
 module Test = 
 
@@ -602,7 +663,7 @@ module Test =
 
     // getRecordFields/getRecordField
 
-    let x = {value = "value"; name = Some "name"; ``type`` = Some "type"; }
+    let x = {value = "value"; name = "name"; ``type`` = "type"; }
 
     let x' = getRecordFields x
 
@@ -624,26 +685,23 @@ module Test =
         let icc = fetchInfoCollectionCounts s.username s.password
         "result" |> ignore
     with 
-    | _ -> failwith "Collections tests failed" 
+    | _ -> failwith "GeneralInfo failed" 
   
     
     // Collections
 
-    let s = Secrets.secrets
-    let url = clusterURL s.username
-    
-    let bmcleartext = 
-        "bookmarks"
-        |> getDecryptedCollection s (getCryptokeysFromDisk Secrets.secrets None)  
-        |> Array.map JsonValue.Parse
+    let bm = getBookmarks Secrets.secrets (getCryptokeysFromDisk Secrets.secrets None)
+    if bm.Length < 800 then 
+        failwith "Collection Bookmark failed"
 
-    let bmkeyword = 
-        bmcleartext.[0] 
-        |> fun x -> x.TryGetProperty "keyword"
-        |> fun x -> match x with | Some x -> x.AsString() | _ -> ""
+    let bm' = bm |> Array.filter (fun x -> if x.children <> [||] then true else false)
+    if bm'.Length < 40 then 
+        failwith "Collection Bookmark failed"
 
-    let bmparentname = 
-        bmcleartext.[0] 
-        |> fun x -> x.TryGetProperty "parentName"
-        |> fun x -> match x with | Some x -> x.AsString() | _ -> ""
+    let bm'' = bm |> Array.filter (fun x -> if x.id = "dkqtmNFIvhbg" then true else false)
+    if bm''.Length <> 1 then 
+        failwith "Collection Bookmark failed"
 
+    let bm''' = bm |> Array.filter (fun x -> if x.tags <> [||] then true else false)
+    if bm'''.Length < 1 then 
+        failwith "Collection Bookmark failed"
