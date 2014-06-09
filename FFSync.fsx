@@ -1,3 +1,10 @@
+
+// TODO Topics
+// -----------
+// parallel tasks
+// secure password store (PasswordVault?)
+// secure in memory strings (IBuffer?)
+
 open System
 open System.IO
 open System.Net
@@ -10,31 +17,13 @@ open FSharp.Data
 open FSharp.Data.Json
 open FSharp.Data.Json.Extensions
 
-// Firefox Sync Secrets
+// Types
 [<AutoOpen>]
-module Secrets = 
-    type Secret = { email : string;
-                    username : string;
-                    password : string;
-                    encryptionpassphrase : string }
+module DataSignatures =
+ 
+    // http://docs.services.mozilla.com/sync/objectformats.html
+    // Firefox Object Formats
 
-    let secrets' =
-        Environment.GetEnvironmentVariable("HOME") + @"\.ssh\ff-secret.json"
-        |> File.ReadAllText
-        |> JsonValue.Parse
-
-
-    let secrets : Secret = { email = (secrets'?email).AsString()
-                             username = (secrets'?username).AsString()
-                             password = (secrets'?password).AsString()
-                             encryptionpassphrase = (secrets'?encryptionpassphrase).AsString() }
-
-
-// http://docs.services.mozilla.com/sync/objectformats.html
-// Firefox Object Formats
-[<AutoOpen>]
-module ObjectFormats = 
-    
     type Addons = { addonID       : string;
                     applicationID : string;
                     enabled       : Boolean;
@@ -143,7 +132,7 @@ module ObjectFormats =
     type History = { histUri  : string;
                      title    : string;
                      visits   : HistoryPayload;
-                     date     : int; // datetime of the visit
+                     date     : Int64; // datetime of the visit
                      ``type`` : HistoryTransition }
     
     type Passwords = { hostname      : string;
@@ -157,11 +146,6 @@ module ObjectFormats =
     type Preferences = { value    : string;
                          name     : string option;
                          ``type`` : string option }
-
-    let x = { value = "value"; name = Some "name"; ``type`` = Some "type" }
-    
-    let x' = x.GetType() 
-    printfn "%A" x'
 
     module TabsVersions =
         
@@ -186,6 +170,52 @@ module ObjectFormats =
     | Version1 of TabsVersions.Version1
     | Version2 of TabsVersions.Version2
 
+
+    // Firefox Sync Secrets
+
+    type Secret = { email                : string;
+                    username             : string;
+                    password             : string;
+                    encryptionpassphrase : string }
+
+
+    // CryptoKeys
+
+    type SyncKeyBundle = { encryption_key : byte[]; hmac_key : byte[] }
+
+    type EncryptedCollection = { iv         : string
+                                 ciphertext : string
+                                 hmac       : string }
+
+    type CryptoKeys = { ``default`` : byte [] [] option }
+
+
+
+// Firefox Sync Secrets
+module Secrets = 
+
+    let mutable defaultLocalSecretFile = Environment.GetEnvironmentVariable("HOME") + @"\.ssh\ff-local-secret.json"
+    let mutable defaultRemoteSecretFile = Environment.GetEnvironmentVariable("HOME") + @"\.ssh\ff-remote-secret.json"
+    
+    /// Read the local Firefox Sync Secrets from disk,
+    /// throw an exception on error cases.
+    let readSecretFile file =
+        let mutable file' = ""
+        match file with
+        | Some file -> file' <- file
+        | _ -> file' <- defaultLocalSecretFile
+        file'
+        |> File.ReadAllText
+        |> JsonValue.Parse
+        
+    let secrets' = readSecretFile None
+
+    let secrets = { email = (secrets'?email).AsString()
+                    username = (secrets'?username).AsString()
+                    password = (secrets'?password).AsString()
+                    encryptionpassphrase = (secrets'?encryptionpassphrase).AsString() }
+
+
 // Utilities
 [<AutoOpen>]
 module Utilities = 
@@ -198,6 +228,13 @@ module Utilities =
     let stringToBytes (s : string) = s.ToCharArray() |> Array.map (fun x -> (byte) x)
     let bytesToString (b : byte[]) = b |> Array.map (char) |> fun cs -> new string(cs)
     let bytesToHex (b : byte[]) = b |> Array.map (sprintf "%x")
+
+    let inline isSubset set subset = 
+        let set' = set |> Set.ofSeq
+        let mutable res = 1
+        for c in subset do
+            if set'.Contains c then res <- 1 * res else res <- 0 * res  
+        if res = 1 then true else false
 
     let removeChars (chars : string) (x : string) = 
         let set = chars.ToCharArray() |> Set.ofArray
@@ -230,16 +267,10 @@ module Utilities =
         let undo89 (s : string) = 
             s.ToUpper().ToCharArray() 
             |> Array.map (fun x -> match x with | '8' -> 'L' | '9' -> 'O' | _ -> x )
-        let s = s'.ToUpper() |> undo89 |> Array.filter (fun x -> if x = '=' then false else true) |> fun cs -> new string(cs)
+        let s = s' |>  undo89 |> Array.filter (fun x -> if x = '=' then false else true) |> fun cs -> new string(cs)
         let encodingChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
         let encodedBitCount = 5
         let byteBitCount = 8
-        let isSubset (set : string) (subset :string) = 
-            let set' = set.ToCharArray() |> Set.ofArray
-            let mutable res = 1
-            for c in subset do
-                if set'.Contains c then res <- 1 * res else res <- 0 * res  
-            if res = 1 then true else false
         if isSubset encodingChars s then       
             let outputBuffer = Array.create (s.Length * encodedBitCount / byteBitCount) 0uy
             let mutable workingByte = 0uy
@@ -263,8 +294,6 @@ module Utilities =
         else
             [||]
 
-
-    type SyncKeyBundle = { encryption_key : byte[]; hmac_key : byte[] }
 
     let syncKeyBundle username key =
         let info = "Sync-AES_256_CBC-HMAC256" + username
@@ -305,6 +334,8 @@ module Utilities =
     
     // Net Utilities 
 
+    /// Return the server response as a string,
+    /// return an empty string in case of error, log error messages to the console.
     let fetchUrlResponse (url : string) requestMethod 
                          (credentials: (string*string) option)
                          (data : byte[] option) (contentType : string option) 
@@ -342,49 +373,50 @@ module Utilities =
         | _ as ex -> printfn "%s" (ex.ToString()); ""
 
 
-// Firefox Sync ServerAPI
+// Firefox Sync Server URLs
 [<AutoOpen>]
-module ServerAPI =
+module ServerUrls =
+
     let serverURL username = "https://auth.services.mozilla.com/user/1.0/" + username + "/node/weave"
     let clusterURL username = fetchUrlResponse (username |> serverURL) "GET" None None None None
 
  
 
-
+// Firefox Crypto Keys
+[<AutoOpen>]
 module CryptoKeys =
-    open Secrets
-    open Utilities
 
+    /// Return the Firefox Crypto Keys as a string (encrypted),
+    /// return an empty string in case of error, log error messages to the console.
     let fetchCryptoKeys username password =
         let url = (clusterURL username) + "1.1/" + username + "/storage/crypto/keys"
         fetchUrlResponse url "GET" (Some (username, password)) None None None
 
-
-
-    type CryptoKeysPayload = { iv         : string
-                               ciphertext : string
-                               hmac       : string }
-
+    /// Fetch the remote Firefox Crypto Keys and write them to disk,
+    /// throw an exception and/or log to console depending on error case.
     let writeCryptoKeysToDisk username password (file : string option) = 
         let secretKeys = fetchCryptoKeys username password
         let mutable file' = ""
         match file with 
         | Some file -> file' <- file
-        | _ -> file' <- Environment.GetEnvironmentVariable("HOME") + @"\.ssh\ff-secretKeys.json"
+        | _ -> file' <- Secrets.defaultRemoteSecretFile
         let stream = new StreamWriter(file', false)
         stream.WriteLine(secretKeys)
         stream.Close()
-
+    
+    /// Read the prefetched remote Firefox Crypto Keys as a string (encrypted) from disk,
+    /// return an empty string on error.
     let readCryptoKeysFromDisk (file : string option) = 
         try 
             match file with 
             | Some file -> file |> File.ReadAllText
-            | _ -> Environment.GetEnvironmentVariable("HOME") + @"\.ssh\ff-secretKeys.json" |> File.ReadAllText
+            | _ -> Secrets.defaultRemoteSecretFile |> File.ReadAllText
         with | _ -> ""
 
 
     let decryptCryptoKeys secrets cryptoKeys = 
-        let ck_pl = (cryptoKeys?payload).AsString() |> JsonValue.Parse
+        let ck = cryptoKeys |> JsonValue.Parse
+        let ck_pl = (ck?payload).AsString() |> JsonValue.Parse
 
         // https://docs.services.mozilla.com/sync/storageformat5.html
         //
@@ -405,28 +437,47 @@ module CryptoKeys =
         //    if local_hmac != record_hmac:
         //      throw Error("HMAC verification failed.")
         //
-        //    cleartext = AESDecrypt(ciphertext, encryption_key, iv)
-        let cleartext = DecryptAES record.ciphertext bundle.encryption_key (record.iv |> Convert.FromBase64String)
-        cleartext
-
+        //    cleartext = AESDecrypt(ciphertext, encryption_key, iv)         
+        record.iv 
+        |> Convert.FromBase64String 
+        |> DecryptAES record.ciphertext bundle.encryption_key 
+        |> keepAsciiPrintableChars
+        
+    let getCryptoKeysFromString secrets cryptokeys =
+        try
+            { ``default`` =
+                cryptokeys
+                |> decryptCryptoKeys secrets
+                |> JsonValue.Parse 
+                |> fun x -> (x.GetProperty "default").AsArray()
+                |> Array.map (fun x -> x.AsString())
+                |> Array.map Convert.FromBase64String
+                |> Some }
+        with 
+        | _ -> { ``default`` = None }
+                
 
     let getCryptoKeys secrets =
         try
             fetchCryptoKeys secrets.username secrets.password
-            |> JsonValue.Parse
-            |> decryptCryptoKeys secrets
-            |> keepAsciiPrintableChars
-            |> JsonValue.Parse 
-            |> fun x -> (x.GetProperty "default").AsArray()
-            |> Array.map (fun x -> x.AsString())
-            |> Array.map Convert.FromBase64String
-            |> Some
+            |> getCryptoKeysFromString secrets
         with 
-        | _ -> None
+        | _ -> { ``default`` = None }
 
+    
+    let getCryptokeysFromDisk secrets file =
+        try
+            readCryptoKeysFromDisk file
+            |> getCryptoKeysFromString secrets
+        with 
+        | _ -> { ``default`` = None }
+
+
+
+
+
+[<AutoOpen>]
 module GeneralInfo = 
-    open Secrets
-    open ServerAPI
     
     let s = Secrets.secrets
     let url = clusterURL s.username  
@@ -451,74 +502,53 @@ module GeneralInfo =
         let url = (clusterURL username) + "1.1/" + username
         fetchUrlResponse url "GET" (Some (username, password)) None None None
 
-    let ic = fetchInfoCollections s.username s.password
 
-    let iq = fetchInfoQuota s.username s.password
-
-    let icu = fetchInfoCollectionUsage s.username s.password
-
-    let icc = fetchInfoCollectionCounts s.username s.password
-
-
+[<AutoOpen>]
 module Collections =
-    open Secrets
-    open ServerAPI
-    open CryptoKeys
 
-    let s = Secrets.secrets
-    let url = clusterURL s.username
-    
     // https://github.com/mikerowehl/firefox-sync-client-php/blob/master/sync.php#L94
-    let fetchCollection username password collection =
+    let fetchFullCollection username password collection =
         let url = (clusterURL username) + "1.1/" + username + "/storage/" + collection + "?full=1"
         fetchUrlResponse url "GET" (Some (username, password)) None None None
 
-    let bm' = fetchCollection s.username s.password "bookmarks"
 
-    let parseCollection collection = 
-        collection
-        |> JsonValue.Parse 
-        |> fun x -> x.AsArray() 
-        |> Array.map string 
-        |> Array.map (fun x -> JsonValue.Parse x) 
-        |> Array.map (fun x -> (x?payload).AsString())
-        |> Array.map (fun x -> JsonValue.Parse x)
-        |> Array.map (fun x -> { iv = x?IV.AsString(); ciphertext = x?ciphertext.AsString(); hmac = x?hmac.AsString() } )
-
-    let bm = parseCollection bm'
-    let cryptoKeysCleartext = 
-        readCryptoKeysFromDisk None 
-        |> JsonValue.Parse 
-        |> decryptCryptoKeys secrets
-    let key = 
-        cryptoKeysCleartext 
-        |> keepAsciiPrintableChars
-        |> JsonValue.Parse 
-        |> fun x -> (x.GetProperty "default").AsArray()
-        |> fun x -> x.[0].AsString()
-        |> Convert.FromBase64String
-    let cleartext = [|for b in bm do yield DecryptAES b.ciphertext key (b.iv |> Convert.FromBase64String) |]
+    let parseEncryptedCollectionArray collection = 
+        try
+            collection
+            |> JsonValue.Parse 
+            |> fun x -> x.AsArray() 
+            |> Array.map string 
+            |> Array.map (fun x -> JsonValue.Parse x) 
+            |> Array.map (fun x -> (x?payload).AsString())
+            |> Array.map (fun x -> JsonValue.Parse x)
+            |> Array.map (fun x -> { iv = x?IV.AsString(); ciphertext = x?ciphertext.AsString(); hmac = x?hmac.AsString() } )
+        with | _ -> [||]
 
 
-    let cleartext' = 
-        cleartext
-        |> Array.map keepAsciiPrintableChars 
-        |> Array.map JsonValue.Parse
+    let getFirstCryptoKey (cryptokeys : CryptoKeys) = 
+        match cryptokeys.``default`` with
+        | Some x -> x.[0]
+        | _ -> [||]
 
-    let x = 
-        cleartext'.[0] 
-        |> fun x -> x.TryGetProperty "keyword"
-        |> fun x -> match x with | Some x -> x.AsString() | _ -> ""
 
-    let x' = 
-        cleartext'.[0] 
-        |> fun x -> x.TryGetProperty "parentName"
-        |> fun x -> match x with | Some x -> x.AsString() | _ -> ""
+    let decryptCollectionArray cryptokeys collection = 
+        try
+            let key = cryptokeys |> getFirstCryptoKey
+            [|for b in collection do yield DecryptAES b.ciphertext key (b.iv |> Convert.FromBase64String) |]
+            |> Array.map keepAsciiPrintableChars
+        with | _ -> [||]
+
+
+    let getDecryptedCollection secrets cryptokeys collection = 
+        try
+            collection
+            |> fetchFullCollection secrets.username secrets.password 
+            |> parseEncryptedCollectionArray
+            |> decryptCollectionArray cryptokeys
+        with | _ -> [||]
 
 
 module Test = 
-    open Utilities
-    open CryptoKeys
 
     // base32Decode
 
@@ -566,7 +596,7 @@ module Test =
     // writeCryptoKeysToDisk
 
     try
-        writeCryptoKeysToDisk secrets.username secrets.password None
+        writeCryptoKeysToDisk Secrets.secrets.username Secrets.secrets.password None
     with | _ -> failwith "writeCryptoKeysToDisk failed"
 
 
@@ -580,3 +610,40 @@ module Test =
 
     if x <> x'' then 
         failwith "getRecordFields/getRecordField failed"
+
+
+    // GeneralInfo
+
+    try
+        let ic = fetchInfoCollections s.username s.password
+
+        let iq = fetchInfoQuota s.username s.password
+
+        let icu = fetchInfoCollectionUsage s.username s.password
+
+        let icc = fetchInfoCollectionCounts s.username s.password
+        "result" |> ignore
+    with 
+    | _ -> failwith "Collections tests failed" 
+  
+    
+    // Collections
+
+    let s = Secrets.secrets
+    let url = clusterURL s.username
+    
+    let bmcleartext = 
+        "bookmarks"
+        |> getDecryptedCollection s (getCryptokeysFromDisk Secrets.secrets None)  
+        |> Array.map JsonValue.Parse
+
+    let bmkeyword = 
+        bmcleartext.[0] 
+        |> fun x -> x.TryGetProperty "keyword"
+        |> fun x -> match x with | Some x -> x.AsString() | _ -> ""
+
+    let bmparentname = 
+        bmcleartext.[0] 
+        |> fun x -> x.TryGetProperty "parentName"
+        |> fun x -> match x with | Some x -> x.AsString() | _ -> ""
+
