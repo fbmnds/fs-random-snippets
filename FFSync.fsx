@@ -1,14 +1,18 @@
+// Firefox Sync Service
+// (formerly Firefox Weave)
 
 // TODO
 // ----
 // railway oriented programming, consistent error/exception handling
-// better types (e.g. GUID, URL)
+// better types (e.g. GUID, URL), http://fsharpforfunandprofit.com/posts/designing-with-types-single-case-dus/
 // proper testing
 // complete functionality
+// async http
 // parallel tasks
 // secure password store (PasswordVault?)
 // secure in memory strings (IBuffer?)
-// make Library
+// convert script into library
+
 
 open System
 open System.IO
@@ -26,94 +30,113 @@ open FSharp.Data.Json.Extensions
 [<AutoOpen>]
 module DataSignatures =
  
-    // http://docs.services.mozilla.com/sync/objectformats.html
     // Firefox Object Formats
 
-    type Addons = { addonID       : string;
-                    applicationID : string;
-                    enabled       : Boolean;
-                    source        : string }
+    // http://docs.services.mozilla.com/sync/objectformats.html
 
-    type Bookmarks = { id            : string;
-                       ``type``      : string;
-                       title         : string;
-                       parentName    : string;
-                       bmkUri        : string;
-                       tags          : string [];
-                       keyword       : string;
-                       description   : string;
-                       loadInSidebar : Boolean;
-                       parentid      : string;
-                       children      : string [] }
+    type URI = URI of string
+    
+    // Firefox docs refer to GUID, but not according to RFC4122 
+    // https://docs.services.mozilla.com/sync/storageformat5.html#metaglobal-record
+    // "The Firefox client uses 12 randomly generated base64url characters, much like for WBO IDs."
+    type WeaveGUID = WeaveGUID of string 
 
-    type Microsummary = { generatorUri  : string;
-                          staticTitle   : string;
-                          title         : string;
-                          bmkUri        : string;
-                          description   : string;
-                          loadInSidebar : Boolean;
-                          tags          : string [];
-                          keyword       : string;
-                          parentid      : string;
-                          parentName    : string;
-                          predecessorid : string;
-                          ``type``      : string }
+    type Addons = 
+        { addonID       : string
+          applicationID : string
+          enabled       : Boolean
+          source        : string }
 
-    type Query = { folderName    : string
-                   queryId       : string;
-                   title         : string;
-                   bmkUri        : string;
-                   description   : string;
-                   loadInSidebar : Boolean;
-                   tags          : string [];
-                   keyword       : string;
-                   parentid      : string;
-                   parentName    : string;
-                   predecessorid : string;
-                   ``type``      : string }
+    type Bookmarks = 
+        { id            : WeaveGUID
+          ``type``      : string
+          title         : string
+          parentName    : string
+          bmkUri        : URI
+          tags          : string []
+          keyword       : string
+          description   : string
+          loadInSidebar : Boolean
+          parentid      : WeaveGUID
+          children      : WeaveGUID [] }
 
-    type Folder = { title         : string;
-                    parentid      : string;
-                    parentName    : string;
-                    predecessorid : string;
-                    ``type``      : string }
+    type Microsummary = 
+        { generatorUri  : string
+          staticTitle   : string
+          title         : string
+          bmkUri        : string
+          description   : string
+          loadInSidebar : Boolean
+          tags          : string []
+          keyword       : string
+          parentid      : string
+          parentName    : string
+          predecessorid : string
+          ``type``      : string }
 
-    type Livemark = { siteUri       : string;
-                      feedUri       : string;
-                      title         : string;
-                      parentid      : string;
-                      parentName    : string;
-                      predecessorid : string;
-                      ``type``      : string }
+    type Query = 
+        { folderName    : string
+          queryId       : string
+          title         : string
+          bmkUri        : string
+          description   : string
+          loadInSidebar : Boolean
+          tags          : string []
+          keyword       : string
+          parentid      : string
+          parentName    : string
+          predecessorid : string
+          ``type``      : string }
 
-    type Separator = { pos           : string;
-                       parentid      : string;
-                       parentName    : string;
-                       predecessorid : string;
-                       ``type``      : string; 
-                       children      : string [] }
+    type Folder = 
+        { title         : string
+          parentid      : string
+          parentName    : string
+          predecessorid : string
+          ``type``      : string }
 
-    type Clients = { name      : string;
-                     ``type``  : string;
-                     commands  : string [];
-                     version   : string;
-                     protocols : string [] }
+    type Livemark = 
+        { siteUri       : string
+          feedUri       : string
+          title         : string
+          parentid      : string
+          parentName    : string
+          predecessorid : string
+          ``type``      : string }
 
-    type ClientsPayload = { name         : string;
-                            formfactor   : string;
-                            application  : string;
-                            version      : string;
-                            capabilities : string;
-                            mpEnabled    : Boolean }
+    type Separator = 
+        { pos           : string
+          parentid      : string
+          parentName    : string
+          predecessorid : string
+          ``type``      : string 
+          children      : string [] }
 
-    type Commands = { receiverID : string;
-                      senderID   : string;
-                      created    : Int64;
-                      action     : string;
-                      data       : string }
+    type Clients = 
+        { name      : string
+          ``type``  : string
+          commands  : string []
+          version   : string
+          protocols : string [] }
 
-    type Forms =  { name :  string;
-                    value : string }
+    type ClientsPayload = 
+        { name         : string
+          formfactor   : string
+          application  : string
+          version      : string
+          capabilities : string
+          mpEnabled    : Boolean }
+
+    type Commands = 
+        { receiverID : string
+          senderID   : string
+          created    : Int64
+          action     : string
+          data       : string }
+
+    type Forms =  
+        { name  :  string
+          value : string }
 
     type HistoryTransition = 
     | TRANSITION_LINK  = 1
@@ -125,29 +148,33 @@ module DataSignatures =
     | TRANSITION_DOWNLOAD = 7
     | TRANSITION_FRAMED_LINK = 8
 
-    type HistoryPayloadVisits = { uri    : string;
-                                  title  : string;
-                                  visits : string [] }
+    type HistoryPayloadVisits = 
+        { uri    : string
+          title  : string
+          visits : string [] }
 
     type HistoryPayload = { items : HistoryPayloadVisits [] }
 
-    type History = { histUri  : string;
-                     title    : string;
-                     visits   : HistoryPayload;
-                     date     : Int64; // datetime of the visit
-                     ``type`` : HistoryTransition }
+    type History = 
+        { histUri  : string
+          title    : string
+          visits   : HistoryPayload
+          date     : Int64 // datetime of the visit
+          ``type`` : HistoryTransition }
     
-    type Passwords = { hostname      : string;
-                       formSubmitURL : string;
-                       httpRealm     : string;
-                       username      : string;
-                       password      : string;
-                       usernameField : string;
-                       passwordField : string }
+    type Passwords = 
+        { hostname      : string
+          formSubmitURL : string
+          httpRealm     : string
+          username      : string
+          password      : string
+          usernameField : string
+          passwordField : string }
 
-    type Preferences = { value    : string;
-                         name     : string;
-                         ``type`` : string }
+    type Preferences = 
+        { value    : string
+          name     : string
+          ``type`` : string }
 
     module TabsVersions =
         
@@ -155,19 +182,22 @@ module DataSignatures =
         | String of string
         | Integer of int 
 
-        type Version1 = { clientName : string;
-                          tabs       : string [];
-                          title      : string;
-                          urlHistory : string [];
-                          icon       : string;
-                          lastUsed   : StringOrInteger }
+        type Version1 = 
+            { clientName : string
+              tabs       : string []
+              title      : string
+              urlHistory : string []
+              icon       : string
+              lastUsed   : StringOrInteger }
 
-        type Version2 = { clientID  : string;
-                          title     : string;
-                          history   : string [];
-                          lastUsed  : Int64; // Time in seconds since Unix epoch that tab was last active.
-                          icon      : string;
-                          groupName : string }
+        type Version2 = 
+            { clientID  : string
+              title     : string
+              history   : string []
+              lastUsed  : Int64 // Time in seconds since Unix epoch that tab was last active.
+              icon      : string
+              groupName : string }
+
     type Tabs = 
     | Version1 of TabsVersions.Version1
     | Version2 of TabsVersions.Version2
@@ -175,24 +205,46 @@ module DataSignatures =
 
     // Firefox Sync Secrets
 
-    type Secret = { email                : string;
-                    username             : string;
-                    password             : string;
-                    encryptionpassphrase : string }
+    type Secret = 
+        { email                : string
+          username             : string
+          password             : string
+          encryptionpassphrase : string }
 
 
     // CryptoKeys
 
-    type SyncKeyBundle = { encryption_key : byte[]; 
-                           hmac_key       : byte[] }
+    type SyncKeyBundle = 
+        { encryption_key : byte[] 
+          hmac_key       : byte[] }
 
-    type EncryptedCollection = { iv         : string
-                                 ciphertext : string
-                                 hmac       : string }
+    type EncryptedCollection = 
+        { iv         : string
+          ciphertext : string
+          hmac       : string }
 
     type CryptoKeys = { ``default`` : byte [] [] }
 
 
+    // MetaGlobal
+    
+    type MetaGlobalVersionInfo = 
+        { version : int
+          syncID  : WeaveGUID }
+
+    type Engine = Engine of string
+
+    type MetaGlobalPayload = 
+        { syncID         : WeaveGUID
+          storageVersion : int        
+          engines        : Map<Engine,MetaGlobalVersionInfo>
+          declined       : Engine [] }
+
+    type MetaGlobal =
+        { username : string         // 8 digits, what kind of mapping?
+          payload  : MetaGlobalPayload
+          id       : string         // "global"
+          modified : float }
 
 // Firefox Sync Secrets
 module Secrets = 
@@ -248,6 +300,22 @@ module Utilities =
             |> fun x -> if x = null then [||] else x 
         with | _ -> [||]
     
+
+
+    let tryGetInteger (jsonvalue : JsonValue) property = 
+        try
+            property 
+            |> jsonvalue.TryGetProperty 
+            |> fun x -> match x with | Some x -> Some (x.AsInteger()) | _ -> None 
+        with | _ -> None
+
+    let tryGetIntegerWithDefault (jsonvalue : JsonValue) defaultinteger property = 
+        try
+            property 
+            |> jsonvalue.TryGetProperty 
+            |> fun x -> match x with | Some x -> x.AsInteger() | _ -> defaultinteger 
+        with | _ -> defaultinteger
+
     // Misc.
 
     let inline padArray len (c : 'T) (b : 'T[])  =
@@ -277,36 +345,48 @@ module Utilities =
         
     let getRecordField (r: 'record) (field : Reflection.PropertyInfo) =
         Microsoft.FSharp.Reflection.FSharpValue.GetRecordField(r,field) |> unbox
-        
+       
+    // Encoding schemes
 
-    // Cryptography
+    let random = new Random()
+    
+    let base32Chars     = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+    let base32'8'9Chars = "ABCDEFGHIJK8MN9PQRSTUVWXYZ234567"
+    let base64Chars     = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890+/"
+    let base64urlChars  = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-_"
 
-    // E:\projects\fs-random-snippets>"%HOME%\Documents\Visual Studio 2012\Projects\Tutorial3\.nuget\nuget" PBKDF2.NET
-    // Installing 'PBKDF2.NET 2.0.0'.
-    // Successfully installed 'PBKDF2.NET 2.0.0'.
-    // #r @"PBKDF2.NET.2.0.0\lib\net45\PBKDF2.NET.dll"
+    let doBase32'8'9 (s : string) = 
+        s.ToUpper().ToCharArray() 
+        |> Array.map (fun x -> match x with | 'L' -> '9' | 'O' -> '9' | _ -> x )
+        |> fun cs -> new string(cs)
 
-    // https://github.com/crowleym/HKDF
-    // #r @"HKDF\RFC5869.dll"
-    // open RFC5869
+    let undoBase32'8'9 (s : string) = 
+        s.ToUpper().ToCharArray() 
+        |> Array.map (fun x -> match x with | '8' -> 'L' | '9' -> 'O' | _ -> x )
+        |> fun cs -> new string(cs)
+    
+    let generateWeaveGUID() = 
+        [| for i in [0 .. 11] do yield base64urlChars.Substring(random.Next(63), 1) |]
+        |> Array.fold (fun r s -> r + s) ""
+        |> (WeaveGUID)
+
 
     // https://bitbucket.org/devinmartin/base32/src/90d7d530beea52a2a82b187728a06404794600b9/Base32/Base32Encoder.cs?at=default
     let base32Decode (s' : string) = 
-        let undo89 (s : string) = 
-            s.ToUpper().ToCharArray() 
-            |> Array.map (fun x -> match x with | '8' -> 'L' | '9' -> 'O' | _ -> x )
-        let s = s' |>  undo89 |> Array.filter (fun x -> if x = '=' then false else true) |> fun cs -> new string(cs)
-        let encodingChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+        let s = 
+            s'.ToUpper().ToCharArray() 
+            |> Array.filter (fun x -> if x = '=' then false else true) 
+            |> fun cs -> new string(cs)        
         let encodedBitCount = 5
         let byteBitCount = 8
-        if isSubset encodingChars s then       
+        if isSubset base32Chars s then       
             let outputBuffer = Array.create (s.Length * encodedBitCount / byteBitCount) 0uy
             let mutable workingByte = 0uy
             let mutable bitsRemaining = byteBitCount
             let mutable mask = 0
             let mutable arrayIndex = 0
             for c in s.ToCharArray() do 
-                let value = encodingChars.IndexOf c
+                let value = base32Chars.IndexOf c
                 if bitsRemaining > encodedBitCount then
                     mask <- value <<< (bitsRemaining - encodedBitCount)
                     workingByte <- (workingByte ||| (byte) mask)
@@ -321,6 +401,20 @@ module Utilities =
             outputBuffer
         else
             [||]
+
+    let base32'8'9Decode (s' : string) = s' |> undoBase32'8'9 |> base32Decode
+     
+
+    // Cryptography, Hashes
+
+    // E:\projects\fs-random-snippets>"%HOME%\Documents\Visual Studio 2012\Projects\Tutorial3\.nuget\nuget" PBKDF2.NET
+    // Installing 'PBKDF2.NET 2.0.0'.
+    // Successfully installed 'PBKDF2.NET 2.0.0'.
+    // #r @"PBKDF2.NET.2.0.0\lib\net45\PBKDF2.NET.dll"
+
+    // https://github.com/crowleym/HKDF
+    // #r @"HKDF\RFC5869.dll"
+    // open RFC5869
 
 
     let syncKeyBundle username key =
@@ -343,7 +437,6 @@ module Utilities =
             aesAlg.Key <- key
             aesAlg.IV <- iv
             aesAlg.Padding <- PaddingMode.Zeros
-        
 
             // Create a decrytor to perform the stream transform.
             use decryptor = aesAlg.CreateDecryptor(aesAlg.Key, aesAlg.IV)
@@ -357,7 +450,6 @@ module Utilities =
             // and place them in a string.
             let plaintext = srDecrypt.ReadToEnd()
             plaintext
-
 
     
     // Net Utilities 
@@ -428,7 +520,7 @@ module CryptoKeys =
         match file with 
         | Some file -> file' <- file
         | _ -> file' <- Secrets.defaultRemoteSecretFile
-        let stream = new StreamWriter(file', false)
+        use stream = new StreamWriter(file', false)
         stream.WriteLine(secretKeys)
         stream.Close()
     
@@ -442,7 +534,7 @@ module CryptoKeys =
         with | _ -> ""
 
 
-    let decryptCryptoKeys secrets cryptoKeys = 
+    let decryptCryptoKeys (secrets : Secret) cryptoKeys = 
         let ck = cryptoKeys |> JsonValue.Parse
         let ck_pl = (ck?payload).AsString() |> JsonValue.Parse
 
@@ -457,7 +549,7 @@ module CryptoKeys =
         //
         //    encryption_key = bundle.encryption_key
         //    hmac_key       = bundle.hmac_key
-        let bundle = syncKeyBundle secrets.username (secrets.encryptionpassphrase |> base32Decode)
+        let bundle = syncKeyBundle secrets.username (secrets.encryptionpassphrase |> base32'8'9Decode)
         //
         //    local_hmac = HMACSHA256(hmac_key, base64(ciphertext))
         let local_hmac = record.ciphertext |> Convert.FromBase64String |> (new HMACSHA256(bundle.hmac_key)).ComputeHash
@@ -484,7 +576,7 @@ module CryptoKeys =
         | _ -> { ``default`` = [||] }
                 
 
-    let getCryptoKeys secrets =
+    let getCryptoKeys (secrets : Secret) =
         try
             fetchCryptoKeys secrets.username secrets.password
             |> getCryptoKeysFromString secrets
@@ -498,9 +590,6 @@ module CryptoKeys =
             |> getCryptoKeysFromString secrets
         with 
         | _ -> { ``default`` = [||] }
-
-
-
 
 
 [<AutoOpen>]
@@ -529,6 +618,36 @@ module GeneralInfo =
         let url = (clusterURL username) + "1.1/" + username
         fetchUrlResponse url "GET" (Some (username, password)) None None None
 
+    let fetchMetaGlobal username password =
+        let url = (clusterURL username) + "1.1/" + username + "/storage/meta/global"
+        fetchUrlResponse url "GET" (Some (username, password)) None None None
+
+    let getMetaGlobal (secrets : Secret) =
+        let parseMetaGlobalPayload p =
+            let p' = JsonValue.Parse p
+            { syncID         = "syncID" |> tryGetString p' |> (WeaveGUID)
+              storageVersion = "storageVersion" |> tryGetIntegerWithDefault p' -99 
+              engines        = "engines" 
+                               |> p'.GetProperty 
+                               |> fun x -> x.Properties 
+                               |> Seq.map (fun (x,y) -> 
+                                               let v = "version" |> tryGetIntegerWithDefault y -99 
+                                               let s = "syncID"  |> tryGetString y |> (WeaveGUID)
+                                               ((Engine) x, { version = v; syncID = s } ))
+                               |> Map.ofSeq
+              declined       = "declined" |> tryGetArray p' |> Array.map (fun x -> x.AsString() |> (Engine)) }            
+        let parseMetaGlobal mg = 
+            { username = "username" |> tryGetString mg
+              payload  = "payload" |> tryGetString mg |> parseMetaGlobalPayload
+              id       = "id" |> tryGetString mg
+              modified = "modified" |> tryGetString mg |> (float) }
+        try 
+            fetchMetaGlobal secrets.username secrets.password
+            |> JsonValue.Parse
+            |> parseMetaGlobal
+            |> Some
+        with | _ -> None
+
 
 [<AutoOpen>]
 module Collections =
@@ -548,7 +667,9 @@ module Collections =
             |> Array.map (fun x -> JsonValue.Parse x) 
             |> Array.map (fun x -> (x?payload).AsString())
             |> Array.map (fun x -> JsonValue.Parse x)
-            |> Array.map (fun x -> { iv = x?IV.AsString(); ciphertext = x?ciphertext.AsString(); hmac = x?hmac.AsString() } )
+            |> Array.map (fun x -> { iv         = x?IV.AsString()
+                                     ciphertext = x?ciphertext.AsString()
+                                     hmac       = x?hmac.AsString() } )
         with | _ -> [||]
 
 
@@ -566,7 +687,7 @@ module Collections =
         with | _ -> [||]
 
 
-    let getDecryptedCollection secrets cryptokeys collection = 
+    let getDecryptedCollection (secrets : Secret) cryptokeys collection = 
         try
             collection
             |> fetchFullCollection secrets.username secrets.password 
@@ -577,17 +698,17 @@ module Collections =
 
     let getBookmarks secrets cryptokeys =
         let parseBookmark bm = 
-            { id            = "id" |> tryGetString bm
+            { id            = "id" |> tryGetString bm |> (WeaveGUID)
               ``type``      = "type" |> tryGetString bm
               title         = "title" |> tryGetString bm
               parentName    = "parentName" |> tryGetString bm
-              bmkUri        = "bmkUri" |> tryGetString bm
+              bmkUri        = "bmkUri" |> tryGetString bm |> (URI)
               tags          = "tags" |> tryGetArray bm |> Array.map (fun x -> x.AsString())
               keyword       = "keyword" |> tryGetString bm
               description   = "description" |> tryGetString bm
               loadInSidebar = "loadInSidebar" |> tryGetBoolean bm false
-              parentid      = "parentid" |> tryGetString bm 
-              children      = "children" |> tryGetArray bm |> Array.map (fun x -> x.AsString()) }
+              parentid      = "parentid" |> tryGetString bm |> (WeaveGUID)
+              children      = "children" |> tryGetArray bm |> Array.map (fun x -> x.AsString() |> (WeaveGUID)) }
         try 
             "bookmarks" 
             |> getDecryptedCollection secrets cryptokeys
@@ -595,19 +716,6 @@ module Collections =
             |> Array.map parseBookmark
         with | _ -> [||]
 
-    // Bookmarks
-
-
-//    type Bookmark = { id            : string;
-//                      ``type``      : string;
-//                      title         : string;
-//                      parentName    : string;
-//                      bmkUri        : string;
-//                      tags          : string [];
-//                      keyword       : string option;
-//                      description   : string option;
-//                      loadInSidebar : Boolean;
-//                      parentid      : string }
 
 module Test = 
 
@@ -617,7 +725,7 @@ module Test =
     // 
     //"Y4NKPS6YXAVI75XNUVODSR472I" 
     // Python: \xc7\x1a\xa7\xcb\xd8\xb8\x2a\x8f\xf6\xed\xa5\x5c\x39\x47\x9f\xd2
-    if ("Y4NKPS6YXAVI75XNUVODSR472I" |> base32Decode |> bytesToHex) <> [|"c7"; "1a"; "a7"; "cb"; "d8"; "b8"; "2a"; "8f"; "f6"; "ed"; "a5"; "5c"; "39"; "47"; "9f"; "d2"|] then 
+    if ("Y4NKPS6YXAVI75XNUVODSR472I" |> base32'8'9Decode |> bytesToHex) <> [|"c7"; "1a"; "a7"; "cb"; "d8"; "b8"; "2a"; "8f"; "f6"; "ed"; "a5"; "5c"; "39"; "47"; "9f"; "d2"|] then 
         failwith "base32Decode failed"
 
 
@@ -641,7 +749,7 @@ module Test =
     //    hmac = HKDF-Expand(sync_key, encryption_key + info + "\x02", 32)
     //      -> 0xbf9e48ac50a2fcc400ae4d30a58dc6a83a7720c32f58c60fd9d02db16e406216
     //                                                 
-    let ff_skb' = syncKeyBundle "johndoe@example.com" ("Y4NKPS6YXAVI75XNUVODSR472I" |> base32Decode)
+    let ff_skb' = syncKeyBundle "johndoe@example.com" ("Y4NKPS6YXAVI75XNUVODSR472I" |> base32'8'9Decode)
     let ff_skb'' = ( ff_skb'.encryption_key |> Array.map (sprintf "%x"), 
                      ff_skb'.hmac_key |> Array.map (sprintf "%x"))
     let ff_skb''' = ([|"8d"; "7"; "65"; "43"; "e"; "a0"; "d9"; "db"; "d5"; "3c"; "53"; "6c";
@@ -698,10 +806,13 @@ module Test =
     if bm'.Length < 40 then 
         failwith "Collection Bookmark failed"
 
-    let bm'' = bm |> Array.filter (fun x -> if x.id = "dkqtmNFIvhbg" then true else false)
+    let bm'' = bm |> Array.filter (fun x -> if x.id = (WeaveGUID) "dkqtmNFIvhbg" then true else false)
     if bm''.Length <> 1 then 
         failwith "Collection Bookmark failed"
 
     let bm''' = bm |> Array.filter (fun x -> if x.tags <> [||] then true else false)
     if bm'''.Length < 1 then 
         failwith "Collection Bookmark failed"
+
+    let mg = getMetaGlobal Secrets.secrets
+    
