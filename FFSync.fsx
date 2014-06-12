@@ -357,7 +357,7 @@ module Utilities =
 
     let doBase32'8'9 (s : string) = 
         s.ToUpper().ToCharArray() 
-        |> Array.map (fun x -> match x with | 'L' -> '9' | 'O' -> '9' | _ -> x )
+        |> Array.map (fun x -> match x with | 'L' -> '8' | 'O' -> '9' | _ -> x )
         |> fun cs -> new string(cs)
 
     let undoBase32'8'9 (s : string) = 
