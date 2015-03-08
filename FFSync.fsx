@@ -246,6 +246,8 @@ module DataSignatures =
           id       : string         // "global"
           modified : float }
 
+    
+
 // Firefox Sync Secrets
 module Secrets = 
 
@@ -593,10 +595,7 @@ module CryptoKeys =
 
 
 [<AutoOpen>]
-module GeneralInfo = 
-    
-    let s = Secrets.secrets
-    let url = clusterURL s.username  
+module GeneralInfo =  
 
     let fetchInfoCollections username password =
         let url = (clusterURL username) + "1.1/" + username + "/info/collections"
@@ -718,6 +717,8 @@ module Collections =
 
 
 module Test = 
+    
+    let s = Secrets.secrets
 
     // base32Decode
 
@@ -785,11 +786,8 @@ module Test =
 
     try
         let ic = fetchInfoCollections s.username s.password
-
         let iq = fetchInfoQuota s.username s.password
-
         let icu = fetchInfoCollectionUsage s.username s.password
-
         let icc = fetchInfoCollectionCounts s.username s.password
         "result" |> ignore
     with 
@@ -800,19 +798,19 @@ module Test =
 
     let bm = getBookmarks Secrets.secrets (getCryptokeysFromDisk Secrets.secrets None)
     if bm.Length < 800 then 
-        failwith "Collection Bookmark failed"
+        failwith "Collection Bookmark failed (retrieve bookmarks)"
 
     let bm' = bm |> Array.filter (fun x -> if x.children <> [||] then true else false)
     if bm'.Length < 40 then 
-        failwith "Collection Bookmark failed"
+        failwith "Collection Bookmark failed (select children)"
 
     let bm'' = bm |> Array.filter (fun x -> if x.id = (WeaveGUID) "dkqtmNFIvhbg" then true else false)
     if bm''.Length <> 1 then 
-        failwith "Collection Bookmark failed"
+        failwith "Collection Bookmark failed (select by id)"
 
     let bm''' = bm |> Array.filter (fun x -> if x.tags <> [||] then true else false)
     if bm'''.Length < 1 then 
-        failwith "Collection Bookmark failed"
+        failwith "Collection Bookmark failed (select tags)"
 
     let mg = getMetaGlobal Secrets.secrets
     
