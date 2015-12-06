@@ -233,6 +233,9 @@ p.Add(i)
 p.Zoom(500)
 
 // 3D plots on funky functions
+
+// need to manually use 'select data' dialog in Excel to make each redraw() appear
+
 let booth x y =
     pown (x + 2. * y - 7.) 2
     + pown (2. * x + y - 5.) 2
@@ -240,16 +243,16 @@ let booth x y =
 let s1 = Surface(booth, (-10., 10.), (-10., 10.))
 
 let branin x y =
-    pown (y - (5. / (4. * pown pi 2)) * pown x 2 + 5. * x / pi - 6.) 2
+    pown (y - (5. / (4. * pown pi 2)) * (pown x 2) + 5. * x / pi - 6.) 2
     + 10.* (1. - 1./ (8. * pi)) * cos(x) + 10.
 
 let s2 = Surface(branin, (-5., 10.), (0., 15.))
-s2.Zoom(50)
+s2.Zoom(100)
 
 let schwefel x y =
     - sin(sqrt(abs(x))) * x
     - sin(sqrt(abs(y))) * y
-let s3 = Surface(schwefel, (-1., 1.), (-1., 1.))
+let s3 = Surface(schwefel, (-5., 10.), (0., 15.))
 s3.Zoom(50)
 s3.Rescale((-10., 10.), (-10., 10.))
 s3.Rescale((-100., 100.), (-100., 100.))

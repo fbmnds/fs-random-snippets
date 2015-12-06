@@ -1,18 +1,25 @@
-﻿/// posted by holoed
-/// http://fsharpcode.blogspot.de/2010/05/monad-state-transformer.html
+﻿/// original source:
+/// http://fsharpcode.blogspot.de/2011/05/reactive-extensions-v1010425.html
+/// http://blogs.msdn.com/b/dsyme/archive/2011/05/30/nice-f-syntax-for-rx-reactive-extensions.aspx
 
+/// current F# reference implementation:
+/// https://github.com/fsprojects/FSharp.Control.Reactive
+
+// Rx home page:
 // Reactive Extensions v1.0.10425 Computation Expression Builder
 // http://msdn.microsoft.com/en-us/data/gg577609
 
-#r @"C:\Users\boe\Documents\Visual Studio 2013\Projects\fsharp-wpf-mvc-series\Chapter 01 - Intro\packages\Rx-Core.2.1.30214.0\lib\Net40\System.Reactive.Core.dll"
-#r @"C:\Users\boe\Documents\Visual Studio 2013\Projects\fsharp-wpf-mvc-series\Chapter 01 - Intro\packages\Rx-Linq.2.1.30214.0\lib\Net40\System.Reactive.Linq.dll"
-#r @"C:\Users\boe\Documents\Visual Studio 2013\Projects\fsharp-wpf-mvc-series\Chapter 01 - Intro\packages\Rx-Interfaces.2.1.30214.0\lib\Net40\System.Reactive.Interfaces.dll"
-#r @"C:\Users\boe\Documents\Visual Studio 2013\Projects\fsharp-wpf-mvc-series\Chapter 01 - Intro\packages\Rx-PlatformServices.2.1.30214.0\lib\Net40\System.Reactive.PlatformServices.dll"
+#I @"Rx\"
+#r @"System.Reactive.Core.dll"
+#r @"System.Reactive.Linq.dll"
+#r @"System.Reactive.Interfaces.dll"
+#r @"System.Reactive.PlatformServices.dll"
 
 open System
 open System.Linq
 open System.Runtime
 open System.Reactive.Linq
+
 
 
 type rxBuilder() =    
@@ -55,13 +62,24 @@ let redTime = rx { while (DateTime.Now.Second > 30) do
                       yield ConsoleColor.Red }
 
 let blueTime = rx { while (DateTime.Now.Second < 30) do
-                      yield ConsoleColor.Green }
+                      yield ConsoleColor.Blue }
 
 let coloredTime  = rx { yield! redTime
                         yield! blueTime } |> repeat
 
 
+// implementation issue:
+// http://stackoverflow.com/questions/6162288/how-do-i-change-the-rx-builder-implementation-to-fix-the-stack-overflow-exception
+//coloredTime.Do( fun _ -> System.Console.WriteLine "test" ).Subscribe()
+//coloredTime.Materialize()
+//coloredTime.Publish()
 
-redTime.Do( fun _ -> System.Console.WriteLine "test" ).Subscribe()
-redTime.Materialize()
-redTime.Publish()
+// test ConsoleColor visibility: 
+// in cmd.exe ok, in VS not visible  
+let sfc = System.Console.ForegroundColor
+if System.Console.ForegroundColor = ConsoleColor.DarkRed then
+    System.Console.ForegroundColor <- ConsoleColor.DarkGreen
+else 
+    System.Console.ForegroundColor <- ConsoleColor.DarkRed
+System.Console.WriteLine "test"
+System.Console.ForegroundColor <- sfc
