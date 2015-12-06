@@ -4,7 +4,7 @@ open System
 open System.IO
 open System.Text.RegularExpressions
 
-#r "FSharp.PowerPack.dll"
+//#r "FSharp.PowerPack.dll"
 
 let (|NameSections|) (f: FileSystemInfo) =
     (f.Name,f.Extension,f.FullName)
@@ -61,7 +61,10 @@ let modifyGitUrl gitUser (fullname:string) =
                     match ((|GitUrl|) gitUser c) with
                     | Some [_;spaces;repo] -> 
                         found := true
-                        yield spaces.Value + "url = git@github.com:" + gitUser + "/" + repo.Value + ".git"
+                        if repo.Value.EndsWith(".git") then
+                            yield spaces.Value + "url = git@github.com:" + gitUser + "/" + repo.Value
+                        else
+                            yield spaces.Value + "url = git@github.com:" + gitUser + "/" + repo.Value + ".git"
                     | _ -> yield c ] 
             with | _ -> []  /// skip this file
         return (if !found && res <> [] then (fullname, res) else ("", [])) } 
