@@ -36,7 +36,7 @@ form.Controls.Add(browser)
 form.Controls.Add(toolbar)
 form.Controls.Add(status)
 form.PerformLayout()
-form.Show()
+form.ShowDialog()
 
 
 Application.Run(form)
