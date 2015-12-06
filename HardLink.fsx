@@ -20,50 +20,51 @@ module Utils =
     let CreateHardLink dest source =
         Kernel32.CreateHardLink(dest, source, IntPtr.Zero)
 
+    
     /// get all FileInfo for ext in dir
-    let GetFileInfo caseSensitive ext dirs =
+    let GetFileTransformed transform caseSensitive ext dirs =
         let getFiles dir =  try Directory.GetFiles dir with | _ -> [||]
         let getDirectories dir = try Directory.GetDirectories dir with | _ -> [||]
         let rec getFileInfo caseSensitive ext dir =
             seq{ for file in getFiles dir do
                      if caseSensitive then 
                          if file.EndsWith(ext) then 
-                             yield new FileInfo(file)
+                             yield (transform file)
                      else
-                         if file.ToLowerInvariant().EndsWith("dll") then 
-                             yield new FileInfo(file)
+                         if file.ToLowerInvariant().EndsWith(ext.ToLowerInvariant()) then 
+                             yield (transform file)
                  for sub in getDirectories dir do
                      yield! getFileInfo caseSensitive ext sub }
         dirs |> Seq.collect (getFileInfo caseSensitive ext) |> Array.ofSeq 
+
+    let GetFileInfo caseSensitive ext dirs = 
+        GetFileTransformed (fun x -> new FileInfo(x)) caseSensitive ext dirs
+
+    let GetFile caseSensitive ext dirs = 
+        GetFileTransformed id caseSensitive ext dirs
 
     let hashTypes = 
         [|"MD5"; "SHA1"; "SHA256"; "SHA384"; "SHA512"; "RIPEMD160"|] 
         |> Array.map (fun t -> t, HashAlgorithm.Create(t))
 
-    let HashFilesDiagnose verbose (hashTypes: (string*HashAlgorithm)[]) (fileInfos : FileInfo[]) =
-        let hashFile (fileInfo : FileInfo) =   
-            let hash =
-                if fileInfo.Length = 0L then None
-                else    
-                    try
-                        let content = File.ReadAllBytes(fileInfo.FullName)
-                        [| for (t,f) in hashTypes do
-                            let zero = System.DateTime.Now.Ticks
-                            let bytes = content |> f.ComputeHash
-                            let ms = (System.DateTime.Now.Ticks - zero) / 1000L
-                            let h = BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant()
-                            if verbose then printfn "[%6d ms] %s %s" ms t h
-                            yield ms, t, h |]
-                        |> Some
-                    with _ -> None
-            match hash with
-            | Some hash -> Some(hash,fileInfo)
-            | _ -> None
-        fileInfos |> Array.map hashFile |> Array.choose (id)
+    let GetFileHashedDiagnostic verbose (hashTypes: (string*HashAlgorithm)[]) (files : string[]) =
+        let hashedFile file =       
+            try
+                let content = File.ReadAllBytes(file)
+                [| for (t,f) in hashTypes do
+                    let zero = System.DateTime.Now.Ticks
+                    let bytes = content |> f.ComputeHash
+                    let ms = (System.DateTime.Now.Ticks - zero) / 1000L
+                    let h = BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant()
+                    if verbose then printfn "[%6d ms] %s %s" ms t h
+                    yield ms, t, h, file |]
+                |> Some
+            with _ -> None
+        files |> Array.map hashedFile |> Array.choose id
 
 
-    let HashFilesSHA1 verbose (fileInfos : FileInfo[]) = 
-        HashFilesDiagnose verbose [|"SHA1",HashAlgorithm.Create("SHA1")|] fileInfos
+    let GetFileSHA1 verbose files = 
+        GetFileHashedDiagnostic verbose [|"SHA1", HashAlgorithm.Create("SHA1")|] files
 
 
 module Tests =
@@ -77,31 +78,25 @@ module Tests =
         then printfn("success")
         else printfn("failure")
 
-    let fileInfos = 
+    let files = 
         [|Environment.GetEnvironmentVariable("PROJECTS")
           Environment.GetEnvironmentVariable("HOMEPATH")|]
-        |> fun x -> Utils.GetFileInfo false "dll" x
-    let ``Utils.GetFileInfo``() =
-        fileInfos
-        |> Array.length
+        |> fun x -> Utils.GetFile false "dll" x
+    let ``Utils.GetFile``() = files |> Array.length
 
-    let hashedFilesDiagnose =
-        fileInfos.[0..90]
-        |> Utils.HashFilesDiagnose true Utils.hashTypes
-    let ``Utils.HashFilesDiagnose``() =
-        hashedFilesDiagnose
+    let hashedFilesDiagnostic = files.[0..90] |> Utils.GetFileHashedDiagnostic true Utils.hashTypes
+    let ``Utils.GetFileHashedDiagnostic``() =
+        hashedFilesDiagnostic
 
     let zeroSHA1 = System.DateTime.Now.Ticks
-    let hashedFilesSHA1 =
-        fileInfos
-        |> Utils.HashFilesSHA1 true
+    let hashedFilesSHA1 = files |> Utils.GetFileSHA1 true
     let msSHA1 = (System.DateTime.Now.Ticks - zeroSHA1) / 1000L
-    let ``Utils.HashFilesSHA1``() =
+    let ``Utils.GetFileSHA1``() =
         hashedFilesSHA1        
 
     let Run() =
         ``Kernel32.Create hard link``()
-        ``Utils.GetFileInfo``() |> printfn "%d"
-        ``Utils.HashFilesDiagnose``() |> printfn "%A"
-        ``Utils.HashFilesSHA1``()  |> printfn "%A"
+        ``Utils.GetFile``() |> printfn "%d"
+        ``Utils.GetFileHashedDiagnostic``() |> printfn "%A"
+        ``Utils.GetFileSHA1``()  |> printfn "%A"
         printfn "[SHA1] hashed %d files in %d ms" hashedFilesSHA1.Length msSHA1
