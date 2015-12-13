@@ -17,7 +17,7 @@ module Kernel32 =
 
 
 module Directory = 
-    /// get all transformed files of a directory by extension
+    /// Get all transformed files of a directory by extension.
     let rec GetFilesTransformed transform caseSensitive ext dir =
         let files =  try Directory.GetFiles dir with | _ -> [||]
         let dirs = try Directory.GetDirectories dir with | _ -> [||]
@@ -33,19 +33,19 @@ module Directory =
 
 
 module Utils =
-    /// Create hard link at dest with source
+    /// Create hard link at dest with source.
     let CreateHardLink dest source =
         Kernel32.CreateHardLink(dest, source, IntPtr.Zero)
     
-    /// get all transformed files of a sequence of directories by extension
+    /// Get all transformed files of a sequence of directories by extension.
     let GetFilesTransformed transform caseSensitive ext dirs =
         dirs |> Seq.collect (Directory.GetFilesTransformed transform caseSensitive ext) |> Array.ofSeq
 
-    /// get FileInfo of all files of a sequence of directories by extension
+    /// Get FileInfo of all files of a sequence of directories by extension.
     let GetFileInfos caseSensitive ext dirs = 
         GetFilesTransformed (fun x -> new FileInfo(x)) caseSensitive ext dirs
 
-    /// get FullName of all files of a sequence of directories by extension
+    /// Get FullName of all files of a sequence of directories by extension.
     let GetFiles caseSensitive ext dirs = 
         GetFilesTransformed id caseSensitive ext dirs
 
@@ -53,7 +53,7 @@ module Utils =
         [|"MD5"; "SHA1"; "SHA256"; "SHA384"; "SHA512"; "RIPEMD160"|] 
         |> Array.map (fun t -> t, HashAlgorithm.Create(t))
 
-    /// get array of variants of hashes for all given files
+    /// Get the array of variants of hashes for each given file.
     let GetFilesHashedDiagnostic verbose (hashTypes: (string*HashAlgorithm)[]) (files : string[]) =
         let hashedFile file =       
             try
@@ -71,7 +71,7 @@ module Utils =
             with _ -> None
         files |> Array.map hashedFile |> Array.choose id
 
-    /// get SHA1-hashes with label and elapsed calculation time for all given files
+    /// Get SHA1-hashes with label and elapsed calculation time for each given file.
     let GetFileSHA1 verbose files = 
         files
         |> GetFilesHashedDiagnostic verbose [|"SHA1", HashAlgorithm.Create("SHA1")|] 
@@ -79,22 +79,27 @@ module Utils =
             let h_ms, h_t, h_hash = h.[0]
             (h_ms, h_t, h_hash, f))
 
-    /// get SHA1-grouping of the given files
+    /// Get SHA1-grouping of the given files.
     let GetFilesGroupedBySHA1 verbose files = 
         files
         |> GetFileSHA1 verbose 
         |> Seq.ofArray 
         |> Seq.groupBy (fun (_,_,h,_) -> h) 
         
-    /// coerce files into hard links
-    let rec CoerceFilesIntoHardLinks (files : seq<string>) = 
-        let head = files |> Seq.head
-        let tail = files |> Seq.skip 1
-        let head2 = Seq.head tail
-        if (try File.Delete(head2); true with | _ as ex -> false) then
-            (try CreateHardLink head2 head with | _ as ex -> false) |> ignore
+    /// Coerce a sequence of files using hard links.
+    let rec CoerceFilesIntoHardLinks verbose (files : seq<string>) = 
+        if files |> Seq.isEmpty then ()
         else 
-            CoerceFilesIntoHardLinks (seq { yield head; yield! (tail |> Seq.skip 1) })
+            let head = files |> Seq.head
+            let tail = files |> Seq.skip 1
+            if tail |> Seq.isEmpty then ()
+            else
+                let head2 = Seq.head tail
+                if (try File.Delete(head2); true with | _ as ex -> (if verbose then printfn "Delete error %s\n%s" head2 ex.Message); false) then
+                    (try CreateHardLink head2 head with | _ as ex -> (if verbose then printfn "Hard link error %s\n%s" head2 ex.Message); false) |> ignore
+                let tail2 = tail |> Seq.skip 1
+                if tail2 |> Seq.isEmpty then ()
+                else CoerceFilesIntoHardLinks verbose (seq { yield head; yield! tail2 })
 
 
 module Tests =
@@ -109,9 +114,9 @@ module Tests =
         else printfn("failure")
 
     let files = 
-        [|Environment.GetEnvironmentVariable("PROJECTS")
-          Environment.GetEnvironmentVariable("HOMEPATH")|]
-        |> fun x -> Utils.GetFiles false "dll" x
+        [|sprintf "%s" (Environment.GetEnvironmentVariable("PROJECTS"))|]
+        //  Environment.GetEnvironmentVariable("HOMEPATH")|]
+        |> Utils.GetFiles false "dll"
     let ``Utils.GetFile``() = files |> Array.length
 
     let hashedFilesDiagnostic = files.[0..90] |> Utils.GetFilesHashedDiagnostic true Utils.hashTypes
@@ -128,6 +133,8 @@ module Tests =
     let ``Utils.GetFilesGroupedBySHA1``() =
         hashedMultiFilesSHA1  
 
+    let ``Utils.CoerceFilesIntoHardLinks``() = files |> Utils.CoerceFilesIntoHardLinks true
+
     let Run() =
         ``Kernel32.Create hard link``()
         ``Utils.GetFile``() |> printfn "%d"
@@ -137,4 +144,4 @@ module Tests =
         ``Utils.GetFilesGroupedBySHA1``() |> printfn "%A"
         printfn "[SHA1] %d multiple files grouped by hash" (hashedMultiFilesSHA1 |> Seq.filter (fun (_,x) -> x |> Seq.length > 1) |> Seq.length)
         printfn "[SHA1] %A min/max of multiple file counts" (hashedMultiFilesSHA1 |> Seq.filter (fun (_,x) -> x |> Seq.length > 1) |> Seq.map (fun (_,x) -> x |> Seq.length) |> fun x -> (x |> Seq.min), (x |> Seq.max))
-
+        ``Utils.CoerceFilesIntoHardLinks``()
