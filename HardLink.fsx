@@ -17,7 +17,7 @@ module Kernel32 =
 
 
 module Directory = 
-    /// Get all transformed files of a directory by extension.
+    /// Select and transform the files of a directory recursively.
     let rec GetFilesTransformed transform select dir =
         let files =  try Directory.GetFiles dir with | _ -> [||]
         let dirs = try Directory.GetDirectories dir with | _ -> [||]
@@ -90,22 +90,26 @@ module Utils =
         |> Seq.groupBy (fun (_,_,h,_) -> h) 
         
     /// Coerce a sequence of files using hard links.
-    let private pDel verbose h msg = if verbose then printfn "Delete error %s\n%s" h msg
-    let private pHL verbose h msg = if verbose then printfn "Hard link error %s\n%s" h msg
-    let rec CoerceFilesIntoHardLinks verbose (files : seq<string>) = 
-        if files |> Seq.isEmpty then ()
-        else 
-            let head = files |> Seq.head
-            let tail = files |> Seq.skip 1
-            if tail |> Seq.isEmpty then ()
-            else
-                let head2 = Seq.head tail
-                if (try File.Delete(head2); true with | _ as ex -> pDel verbose head2 ex.Message; false) then
-                    (try CreateHardLink head2 head with | _ as ex -> pHL verbose head2 ex.Message; false) |> ignore
-                let tail2 = tail |> Seq.skip 1
-                if tail2 |> Seq.isEmpty then ()
-                else CoerceFilesIntoHardLinks verbose (seq { yield head; yield! tail2 })
-
+    let CoerceFilesIntoHardLinks verbose (files : seq<string>) = 
+        let pDel h msg = if verbose then printfn "Delete error %s\n%s" h msg
+        let pHL h msg = if verbose then printfn "Hard link error %s\n%s" h msg
+        let rec coerceFilesIntoHardLinks verbose (files : seq<string>) = 
+            if files |> Seq.isEmpty then ()
+            else 
+                let head = files |> Seq.head
+                let tail = files |> Seq.skip 1
+                if tail |> Seq.isEmpty then ()
+                else
+                    let head2 = Seq.head tail
+                    if (try File.Delete(head2); true with | _ as ex -> pDel head2 ex.Message; false) then
+                        (try CreateHardLink head2 head with | _ as ex -> pHL head2 ex.Message; false) |> ignore
+                    let tail2 = tail |> Seq.skip 1
+                    if tail2 |> Seq.isEmpty then ()
+                    else coerceFilesIntoHardLinks verbose (seq { yield head; yield! tail2 })
+        files |> Array.ofSeq 
+        |> GetFilesGroupedBySHA1 verbose
+        |> Seq.map (fun (_,x) -> (x |> Seq.map (fun (_,_,_,y) -> y))) 
+        |> Seq.iter (coerceFilesIntoHardLinks verbose)
 
 module Tests =
     let ``Kernel32.Create hard link``() =
@@ -157,17 +161,24 @@ module Tests =
         |> Seq.map (fun (_,x) -> x |> Seq.length) |> fun x -> (x |> Seq.min), (x |> Seq.max) 
         |> printfn "[SHA1] %A min/max of multiple file counts"
         
-        hashedMultiFilesSHA1 
-        |> Seq.map (fun (_,x) -> (x |> Seq.map (fun (_,_,_,y) -> y))) 
-        |> Seq.iter (Utils.CoerceFilesIntoHardLinks true)
+        files |> Utils.CoerceFilesIntoHardLinks true
 
         let files2 = dirs |> Utils.GetFiles false "dll" 
         files2 |> Array.sortInPlace
-        let hashedMultiFilesSHA1_2 = Utils.GetFilesGroupedBySHA1 false files
 
         let getSHA1 files = files |> Utils.GetFilesSHA1 false |> Array.map (fun (_,_,h,f) -> h,f)
         if ((files |> getSHA1) <> (files2 |> getSHA1)) then printfn "Utils.CoerceFilesIntoHardLinks failure" 
         else printfn "Utils.CoerceFilesIntoHardLinks success"
-        files, files2
+
+        let files3 = 
+            dirs.[0] 
+            |> Directory.GetFilesTransformed id (fun _-> true) 
+            |> Array.ofSeq
+            |> Utils.GetFilesGroupedBySHA1 false
+            |> Seq.map (fun (x,y) -> x, y|> Seq.map (fun (_,_,_,z) -> z))
+            |> Seq.map (fun (x,y) -> x, (new FileInfo (y |> Seq.head)).Length, y)
+            |> Seq.sortBy (fun (_,size,_) -> -1L*size)
+
+        files, files2, files3
 
     
