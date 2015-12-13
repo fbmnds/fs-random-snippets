@@ -18,18 +18,13 @@ module Kernel32 =
 
 module Directory = 
     /// Get all transformed files of a directory by extension.
-    let rec GetFilesTransformed transform caseSensitive ext dir =
+    let rec GetFilesTransformed transform select dir =
         let files =  try Directory.GetFiles dir with | _ -> [||]
         let dirs = try Directory.GetDirectories dir with | _ -> [||]
         seq { for file in files do
-                  if caseSensitive then 
-                      if file.EndsWith(ext) then 
-                          yield (transform file)
-                  else
-                      if file.ToLowerInvariant().EndsWith(ext.ToLowerInvariant()) then 
-                          yield (transform file)
+                  if file |> select then yield (transform file)
               for sub in dirs do
-                  yield! GetFilesTransformed transform caseSensitive ext sub }
+                  yield! GetFilesTransformed transform select sub }
 
 
 module Utils =
@@ -39,7 +34,12 @@ module Utils =
     
     /// Get all transformed files of a sequence of directories by extension.
     let GetFilesTransformed transform caseSensitive ext dirs =
-        dirs |> Seq.collect (Directory.GetFilesTransformed transform caseSensitive ext) |> Array.ofSeq
+        let select (file : string) = 
+            if caseSensitive then 
+                if file.EndsWith(ext) then true else false
+            else
+                if file.ToLowerInvariant().EndsWith(ext.ToLowerInvariant()) then true else false
+        dirs |> Seq.collect (Directory.GetFilesTransformed transform select) |> Array.ofSeq
 
     /// Get FileInfo of all files of a sequence of directories by extension.
     let GetFileInfos caseSensitive ext dirs = 
@@ -72,21 +72,26 @@ module Utils =
         files |> Array.map hashedFile |> Array.choose id
 
     /// Get SHA1-hashes with label and elapsed calculation time for each given file.
-    let GetFileSHA1 verbose files = 
+    let GetFilesSHA1 verbose files = 
         files
         |> GetFilesHashedDiagnostic verbose [|"SHA1", HashAlgorithm.Create("SHA1")|] 
         |> Array.map (fun (h,f) -> 
             let h_ms, h_t, h_hash = h.[0]
             (h_ms, h_t, h_hash, f))
 
+    /// Get SHA1-hashes with label and elapsed calculation time for the given file.
+    let GetFileSHA1 verbose file = [|file|] |> GetFilesSHA1 verbose
+
     /// Get SHA1-grouping of the given files.
     let GetFilesGroupedBySHA1 verbose files = 
         files
-        |> GetFileSHA1 verbose 
+        |> GetFilesSHA1 verbose 
         |> Seq.ofArray 
         |> Seq.groupBy (fun (_,_,h,_) -> h) 
         
     /// Coerce a sequence of files using hard links.
+    let private pDel verbose h msg = if verbose then printfn "Delete error %s\n%s" h msg
+    let private pHL verbose h msg = if verbose then printfn "Hard link error %s\n%s" h msg
     let rec CoerceFilesIntoHardLinks verbose (files : seq<string>) = 
         if files |> Seq.isEmpty then ()
         else 
@@ -95,8 +100,8 @@ module Utils =
             if tail |> Seq.isEmpty then ()
             else
                 let head2 = Seq.head tail
-                if (try File.Delete(head2); true with | _ as ex -> (if verbose then printfn "Delete error %s\n%s" head2 ex.Message); false) then
-                    (try CreateHardLink head2 head with | _ as ex -> (if verbose then printfn "Hard link error %s\n%s" head2 ex.Message); false) |> ignore
+                if (try File.Delete(head2); true with | _ as ex -> pDel verbose head2 ex.Message; false) then
+                    (try CreateHardLink head2 head with | _ as ex -> pHL verbose head2 ex.Message; false) |> ignore
                 let tail2 = tail |> Seq.skip 1
                 if tail2 |> Seq.isEmpty then ()
                 else CoerceFilesIntoHardLinks verbose (seq { yield head; yield! tail2 })
@@ -110,38 +115,59 @@ module Tests =
                     @"data\Example2.xlsx", 
                     @"data\Example1.xlsx", 
                     IntPtr.Zero))
-        then printfn("success")
-        else printfn("failure")
+        then printfn "Basic test success"
+        else failwith "Basic test failure" |> ignore
 
-    let files = 
-        [|sprintf "%s" (Environment.GetEnvironmentVariable("PROJECTS"))|]
-        //  Environment.GetEnvironmentVariable("HOMEPATH")|]
-        |> Utils.GetFiles false "dll"
-    let ``Utils.GetFile``() = files |> Array.length
-
-    let hashedFilesDiagnostic = files.[0..90] |> Utils.GetFilesHashedDiagnostic true Utils.hashTypes
-    let ``Utils.GetFileHashedDiagnostic``() =
-        hashedFilesDiagnostic
-
-    let zeroSHA1 = System.DateTime.Now.Ticks
-    let hashedFilesSHA1 = files |> Utils.GetFileSHA1 true
-    let msSHA1 = (System.DateTime.Now.Ticks - zeroSHA1) / 1000L
-    let ``Utils.GetFileSHA1``() =
-        hashedFilesSHA1        
-    
-    let hashedMultiFilesSHA1 = files |> Utils.GetFilesGroupedBySHA1 false
-    let ``Utils.GetFilesGroupedBySHA1``() =
-        hashedMultiFilesSHA1  
-
-    let ``Utils.CoerceFilesIntoHardLinks``() = files |> Utils.CoerceFilesIntoHardLinks true
-
+    let mutable zeroSHA1 = 0L
+    let mutable msSHA1 = 0L
+    let ``Utils.GetFileSHA1`` files = 
+        let hashedFilesSHA1 files = 
+            zeroSHA1 <- System.DateTime.Now.Ticks
+            let res = files |> Utils.GetFilesSHA1 true
+            msSHA1 <- (System.DateTime.Now.Ticks - zeroSHA1) / 1000L
+            res
+        files |> hashedFilesSHA1            
+     
     let Run() =
         ``Kernel32.Create hard link``()
-        ``Utils.GetFile``() |> printfn "%d"
-        ``Utils.GetFileHashedDiagnostic``() |> printfn "%A"
-        ``Utils.GetFileSHA1``()  |> printfn "%A"
+        
+        // using the COPY "projects2" of "$PROJECTS=projects"
+        let dirs = 
+            [| sprintf "%s2" (Environment.GetEnvironmentVariable("PROJECTS")) |]
+               //Environment.GetEnvironmentVariable("HOMEPATH") |]
+        
+        let files = dirs |> Utils.GetFiles false "dll"
+        files |> Array.sortInPlace
+
+        printfn "Utils.GetFiles: %d in directory %A" (files |> Array.length) dirs
+
+        files.[0..9] |> Utils.GetFilesHashedDiagnostic true Utils.hashTypes |> Array.iter (printfn "%A")
+        
+        let hashedFilesSHA1 = files |> Utils.GetFilesSHA1 false
         printfn "[SHA1] hashed %d files in %d ms" hashedFilesSHA1.Length msSHA1
-        ``Utils.GetFilesGroupedBySHA1``() |> printfn "%A"
-        printfn "[SHA1] %d multiple files grouped by hash" (hashedMultiFilesSHA1 |> Seq.filter (fun (_,x) -> x |> Seq.length > 1) |> Seq.length)
-        printfn "[SHA1] %A min/max of multiple file counts" (hashedMultiFilesSHA1 |> Seq.filter (fun (_,x) -> x |> Seq.length > 1) |> Seq.map (fun (_,x) -> x |> Seq.length) |> fun x -> (x |> Seq.min), (x |> Seq.max))
-        ``Utils.CoerceFilesIntoHardLinks``()
+        hashedFilesSHA1.[0..9] |> Array.iter (printfn "[SHA1] %A")
+         
+        let hashedMultiFilesSHA1 = Utils.GetFilesGroupedBySHA1 false files
+        hashedMultiFilesSHA1 |> Seq.take 10 |> Seq.iter (fun x -> printfn "file group by hash: %s\n%A" (fst x) (snd x))
+
+        hashedMultiFilesSHA1 |> Seq.filter (fun (_,x) -> x |> Seq.length > 1) |> Seq.length
+        |> printfn "[SHA1] %d multiple files grouped by hash"
+
+        hashedMultiFilesSHA1 |> Seq.filter (fun (_,x) -> x |> Seq.length > 1) 
+        |> Seq.map (fun (_,x) -> x |> Seq.length) |> fun x -> (x |> Seq.min), (x |> Seq.max) 
+        |> printfn "[SHA1] %A min/max of multiple file counts"
+        
+        hashedMultiFilesSHA1 
+        |> Seq.map (fun (_,x) -> (x |> Seq.map (fun (_,_,_,y) -> y))) 
+        |> Seq.iter (Utils.CoerceFilesIntoHardLinks true)
+
+        let files2 = dirs |> Utils.GetFiles false "dll" 
+        files2 |> Array.sortInPlace
+        let hashedMultiFilesSHA1_2 = Utils.GetFilesGroupedBySHA1 false files
+
+        let getSHA1 files = files |> Utils.GetFilesSHA1 false |> Array.map (fun (_,_,h,f) -> h,f)
+        if ((files |> getSHA1) <> (files2 |> getSHA1)) then printfn "Utils.CoerceFilesIntoHardLinks failure" 
+        else printfn "Utils.CoerceFilesIntoHardLinks success"
+        files, files2
+
+    
