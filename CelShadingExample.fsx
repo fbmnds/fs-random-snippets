@@ -53,23 +53,20 @@ module ManifestResourceLoader =
         reader.ReadToEnd()
 
     let LoadTextFile(textFileName : string) = 
-        printfn "%s" (Path.Combine(__SOURCE_DIRECTORY__, textFileName))
         File.ReadAllText(Path.Combine(__SOURCE_DIRECTORY__, textFileName))
 
 
+//  Original Source: http://prideout.net/blog/?p=22
+
+/// <summary>
+/// The TrefoilKnot class creates geometry
+/// for a trefoil knot.
+/// </summary>
 module TrefoilKnot = 
     open SharpGL.SceneGraph.Shaders
     open System.Collections.Generic
     open SharpGL.Shaders
     open SharpGL.Enumerations
-
-    //  Original Source: http://prideout.net/blog/?p=22
-
-    /// <summary>
-    /// The TrefoilKnot class creates geometry
-    /// for a trefoil knot.
-    /// </summary>
-
 
 
     /// The number of slices and stacks.
@@ -116,7 +113,7 @@ module TrefoilKnot =
         let mutable dv = new vec3()
         dv.x <- -1.5f*b*(Sin (1.5f*u))*(Cos u) - (a + b*(Cos (1.5f*u))*(Sin u))
         dv.y <- -1.5f*b*(Sin (1.5f*u))*(Sin u) + (a + b*(Cos (1.5f*u))*(Cos u))
-        dv.z <- 1.5f*c*(Cos (1.5f*u))
+        dv.z <-  1.5f*c*(Cos (1.5f*u))
             
         let q = glm.normalize(dv)
         let qvn = glm.normalize(new vec3(q.y, -q.x, 0.0f))
@@ -156,12 +153,14 @@ module TrefoilKnot =
         vertexBuffer.Bind(gl)
         vertices |> Array.map (fun v -> v.to_array())
         |> Array.iter (fun x -> vertexBuffer.SetData(gl, vertexAttributeLocation, x, false, 3))
+        vertexBuffer.Unbind(gl)
          
         //let normalBuffer = new VertexBuffer()
         normalBuffer.Create(gl)
         normalBuffer.Bind(gl)
         normals |> Array.map (fun v -> v.to_array())
         |> Array.iter (fun x -> normalBuffer.SetData(gl, normalAttributeLocation, x, false, 3))     
+        normalBuffer.Unbind(gl)
 
     let CreateIndexBuffer(gl) =
         
@@ -177,16 +176,15 @@ module TrefoilKnot =
                 indices.[count+3] <- (uint16 ((n + j + stacks) % vertexCount))
                 indices.[count+4] <- (uint16 ((n + (j + 1) % stacks) % vertexCount))
                 indices.[count+5] <- (uint16 ((n + (j + 1) % stacks + stacks) % vertexCount))
-                count <- count+6
-                
-                n <- n + stacks
-            
+                count <- count+6          
+            n <- n + stacks 
 
         //let indexBuffer = new IndexBuffer()
         do
             indexBuffer.Create(gl)
             indexBuffer.Bind(gl)
             indexBuffer.SetData(gl, indices)        
+            indexBuffer.Unbind(gl)
 
     let GenerateGeometry (gl, vertexAttributeLocation, normalAttributeLocation) =
         //  Create the vertex array object. This will hold the state of all of the
@@ -217,10 +215,12 @@ module TrefoilKnot =
 
         let positionAttribute = 0u
         let normalAttribute = 1u
+        let indexAttribute = 2u
         let attributeLocations = new Dictionary<uint32, string>()
         do 
             attributeLocations.Add (positionAttribute, "Position")
             attributeLocations.Add (normalAttribute, "Normal")
+            attributeLocations.Add (indexAttribute, "Index")
 
         //  Scene geometry - a trefoil knot.
         //let trefoilKnot = new TrefoilKnot()   
@@ -306,8 +306,10 @@ module TrefoilKnot =
             //  Render the trefoil.
             //let vertices = trefoilKnot.Vertices;
             gl.Begin(BeginMode.Triangles)
-            [|0 .. vertexCount-1|]// indices
-            |> Array.iter (fun x -> 
+            //[|0 .. vertexCount-1|]// indices
+            indices
+            |> Array.iter (fun y -> 
+                let x = (min (int y) (vertexCount - 1))
                 gl.Vertex(vertices.[x].x, vertices.[x].y, vertices.[x].z)
                 gl.Normal(normals.[x].x, normals.[x].y, normals.[x].z))
             gl.End()
@@ -322,27 +324,26 @@ module TrefoilKnot =
         /// <param name="gl">The OpenGL instance.</param>
         /// <param name="useToonShader">if set to <c>true</c> use the toon shader, otherwise use a per-pixel shader.</param>
         member x.RenderRetainedMode(gl : OpenGL, useToonShader) =
-        
-            
-            
-            //  Setup the modelview matrix.
-            gl.MatrixMode(OpenGL.GL_TRIANGLES)
+
+            gl.MatrixMode(OpenGL.GL_MODELVIEW)
             gl.LoadIdentity()
             gl.MultMatrix(modelviewMatrix.to_array())
-            
+                                                                        
+            //GenerateGeometry(gl, positionAttribute, normalAttribute)
+            //x.Initialise(gl)
             gl.Begin(BeginMode.Triangles)
-            [|0 .. vertexCount-1|]// indices
-            |> Array.iter (fun x -> 
+            //[|0 .. vertexCount-1|]// indices
+            indices
+            |> Array.iter (fun y -> 
+                let x = (min (int y) (vertexCount - 1))
                 gl.Vertex(vertices.[x].x, vertices.[x].y, vertices.[x].z)
                 gl.Normal(normals.[x].x, normals.[x].y, normals.[x].z))
-            gl.End()            
-            
-                        
-            GenerateGeometry(gl, positionAttribute, normalAttribute)
-
 
             //  Get a reference to the appropriate shader.
             let shader = if useToonShader then shaderToon else shaderPerPixel
+
+            //indexBuffer.Bind(gl)
+            //indexBuffer.SetData(gl, indices) 
 
             //  Use the shader program.
             shader.Bind(gl)
@@ -354,29 +355,35 @@ module TrefoilKnot =
             shader.SetUniform1(gl, "Shininess", 50.f)
 
             //  Set the light position.
-            shader.SetUniform3(gl, "LightPosition", 0.25f, 0.25f, 1.f);
+            shader.SetUniform3(gl, "LightPosition", 0.25f, 0.25f, 1.f)
 
             //  Set the matrices.
-            shader.SetUniformMatrix4(gl, "Projection", projectionMatrix.to_array());
-            shader.SetUniformMatrix4(gl, "Modelview", modelviewMatrix.to_array());
-            shader.SetUniformMatrix3(gl, "NormalMatrix", normalMatrix.to_array());
+            shader.SetUniformMatrix4(gl, "Projection", projectionMatrix.to_array())
+            shader.SetUniformMatrix4(gl, "Modelview", modelviewMatrix.to_array())
+            shader.SetUniformMatrix3(gl, "NormalMatrix", normalMatrix.to_array())
 
             //  Bind the vertex buffer array.
-            vertexBufferArray.Bind(gl)
-                        
+            vertexBufferArray.Bind(gl)      
+            
             //  Draw the elements.
-            gl.DrawElements(OpenGL.GL_TRIANGLES, indices.Length, OpenGL.GL_UNSIGNED_SHORT, System.IntPtr(int indices.[0]))  
-
+            //shader.GetInfoLog(gl) |> printfn "shader.GetInfoLog %s"
+            //gl.UseProgram(shader.ShaderProgramObject)
+            gl.DrawElements(OpenGL.GL_TRIANGLES, indices.Length, OpenGL.GL_UNSIGNED_SHORT, System.IntPtr(int indices.[0]))
+            //gl.DrawArrays(OpenGL.GL_TRIANGLES, (int indices.[0]), indices.Length)
             //  Unbind the shader.
             shader.Unbind(gl)
-            //vertexBufferArray.Unbind(gl)
+            vertexBufferArray.Unbind(gl)
+            //indexBuffer.Unbind(gl)
+            gl.End()
 
 module CelShadingExample =
     let mutable theta = 0.f
     let scene = new TrefoilKnot.Scene()
     let axies = new Axies()
+    let mutable comboRenderModeSelectedIndex = 0
+    let mutable checkBoxUseToonShaderIsChecked = false
     
-
+     
     let OpenGLControl_OpenGLDraw(sender:obj, args : OpenGLEventArgs) =
         //  Get the OpenGL instance.
         let gl = args.OpenGL
@@ -384,26 +391,25 @@ module CelShadingExample =
         //  Add a bit to theta (how much we're rotating the scene) and create the modelview
         //  and normal matrices.
   
-        theta <- theta + 0.01f
+        theta <- theta + 0.015f
         scene.CreateModelviewAndNormalMatrix(theta)
-            
+
         //  Clear the color and depth buffer.
-        gl.ClearColor(0.f, 0.f, 0.f, 1.f)
+        gl.ClearColor(1.f, 1.f, 1.f, 0.f)
         gl.Clear(OpenGL.GL_COLOR_BUFFER_BIT ||| OpenGL.GL_DEPTH_BUFFER_BIT ||| OpenGL.GL_STENCIL_BUFFER_BIT)
+        //gl.Color(0.f,0.6f,0.8f,0.f)
+      
+        //gl.BlendColor(1.f,1.f,1.f,0.f)
+        gl.Enable(OpenGL.GL_DEPTH_TEST)
+        gl.DepthFunc(OpenGL.GL_LESS)         
             
         //  Render the scene in either immediate or retained mode.
-        do 
-            //axies.Render(gl, RenderMode.Render)
-            //scene.RenderImmediateMode(gl)
-            scene.RenderRetainedMode(gl, false)
-
-//        match comboRenderMode.SelectedIndex with
-//        | 0 -> scene.RenderRetainedMode(gl, checkBoxUseToonShader.IsChecked.Value)
-//        | 1 ->
-//            do 
-//                axies.Render(gl, RenderMode.Design)
-//                scene.RenderImmediateMode(gl)
-//        | _ -> () 
+        axies.Render(gl, RenderMode.Design)
+        match comboRenderModeSelectedIndex with
+        | 0 -> scene.RenderRetainedMode(gl, checkBoxUseToonShaderIsChecked)
+        | 1 -> gl.Color(0.f,0.6f,0.8f,0.f)
+               scene.RenderImmediateMode(gl)
+        | _ -> () 
         
     let OpenGLControl_OpenGLInitialized(sender : obj, args : OpenGLEventArgs) =
         
@@ -417,13 +423,15 @@ module CelShadingExample =
         
         //  Get the OpenGL instance.
         let gl = args.OpenGL       
-     
+        let s = sender :?> SharpGL.WPF.OpenGLControl
         //  Create the projection matrix for the screen size.
-        scene.CreateProjectionMatrix(gl, 800.f, 600.f)//(float32 actualWidth), (float)ActualHeight);
+        scene.CreateProjectionMatrix(gl, float32 s.ActualWidth, float32 s.ActualHeight)//actualWidth, actualHeight)
         
-
-
-
+    let ComboBox_Selected(sender : obj, args) =
+        comboRenderModeSelectedIndex <- (sender :?> ComboBox).SelectedIndex
+        
+    let CheckBox_Selected(sender : obj, args) =
+        checkBoxUseToonShaderIsChecked <- (sender :?> CheckBox).IsChecked.Value  
 
 let loadXamlWindow (filename:string) =
     let reader = XmlReader.Create(filename)
@@ -437,6 +445,11 @@ let w =
     |> fun x -> Path.Combine(System.Environment.GetEnvironmentVariable("PROJECTS"), x) 
     |> fun x -> loadXamlWindow(x)
 
+let comboBox = w.FindName("comboRenderMode") :?> ComboBox
+comboBox.SelectionChanged.Add (fun x -> CelShadingExample.ComboBox_Selected(comboBox,x))
+
+let checkBox = w.FindName("checkBoxUseToonShader") :?> CheckBox
+checkBox.Checked.Add (fun x -> CelShadingExample.CheckBox_Selected(checkBox,x))
 
 //<sharpGL:OpenGLControl x:Name="openGlCtrl"
 //OpenGLDraw="OpenGLControl_OpenGLDraw" OpenGLInitialized="OpenGLControl_OpenGLInitialized" 
@@ -445,24 +458,25 @@ let w =
 let mutable openGlCtrl =  w.FindName("openGlCtrl") :?> SharpGL.WPF.OpenGLControl
 openGlCtrl.InitializeComponent()
 
-
 let gl  = SharpGL.OpenGL()
-gl.Create(SharpGL.Version.OpenGLVersion.OpenGL3_1, SharpGL.RenderContextType.FBO, 800, 600, 32, System.IntPtr.Zero) |> printfn "%A"
-let glr = ref (openGlCtrl.OpenGL)
-glr := gl
+//gl.Create(SharpGL.Version.OpenGLVersion.OpenGL3_1, 
+//          SharpGL.RenderContextType.FBO, 
+//          (int openGlCtrl.ActualWidth), (int openGlCtrl.ActualHeight), 32, 
+//          System.IntPtr.Zero) |> printfn "%A"
+
 printfn "#0"
-CelShadingExample.scene.Initialise(gl)
+//CelShadingExample.scene.Initialise(gl)
 printfn "#1"
-openGlCtrl.OpenGLDraw.Add (fun x -> CelShadingExample.OpenGLControl_OpenGLDraw(gl,x) )
+openGlCtrl.OpenGLDraw.Add (fun x -> CelShadingExample.OpenGLControl_OpenGLDraw(openGlCtrl,x) )
 printfn "#2"
-openGlCtrl.OpenGLInitialized.Add (fun x -> CelShadingExample.OpenGLControl_OpenGLInitialized(gl,x) )
+openGlCtrl.OpenGLInitialized.Add (fun x -> CelShadingExample.OpenGLControl_OpenGLInitialized(openGlCtrl,x) )
 printfn "#3"
 openGlCtrl.RenderContextType <- RenderContextType.FBO
 printfn "#4"
-openGlCtrl.Resized.Add (fun x -> CelShadingExample.OpenGLControl_Resized(gl,x) )
+openGlCtrl.Resized.Add (fun x -> CelShadingExample.OpenGLControl_Resized(openGlCtrl,x) )
 printfn "#5"
-//openGlCtrl.Visibility <- Visibility.Visible
-
+openGlCtrl.Visibility <- Visibility.Visible
+printfn "#6"
 
 
 w.Show()
