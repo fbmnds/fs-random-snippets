@@ -60,7 +60,7 @@ module ManifestResourceLoader =
 module TrefoilKnot = 
     open SharpGL.SceneGraph.Shaders
     open System.Collections.Generic
-    //open SharpGL.Shaders
+    open SharpGL.Shaders
     open SharpGL.Enumerations
 
     //  Original Source: http://prideout.net/blog/?p=22
@@ -78,9 +78,9 @@ module TrefoilKnot =
     let vertexCount = slices * stacks
     let indexCount = vertexCount * 6
 
-    let vertices : vec3[] = Array.init<vec3> vertexCount (fun _ -> new vec3()) 
-    let normals : vec3[] = Array.init<vec3> vertexCount (fun _ -> new vec3())
-    let indices : uint16[] = Array.init<uint16> indexCount (fun _ -> 0us)
+    let mutable vertices : vec3[] = Array.init<vec3> vertexCount (fun _ -> new vec3()) 
+    let mutable normals : vec3[] = Array.init<vec3> vertexCount (fun _ -> new vec3())
+    let mutable indices : uint16[] = Array.init<uint16> indexCount (fun _ -> 0us)
 
     let vertexBuffer = new VertexBuffer()
     let normalBuffer = new VertexBuffer()
@@ -207,13 +207,20 @@ module TrefoilKnot =
 
     type Scene() =
         //  The shaders we use.
-        let mutable shaderPerPixel = new ShaderProgram()
-        let mutable shaderToon = new ShaderProgram()
+        let mutable shaderPerPixel = ShaderProgram()
+        let mutable shaderToon = ShaderProgram()
         
         //  The modelview, projection and normal matrices.
         let mutable modelviewMatrix = mat4.identity()
         let mutable projectionMatrix = mat4.identity()
         let mutable normalMatrix = mat3.identity()
+
+        let positionAttribute = 0u
+        let normalAttribute = 1u
+        let attributeLocations = new Dictionary<uint32, string>()
+        do 
+            attributeLocations.Add (positionAttribute, "Position")
+            attributeLocations.Add (normalAttribute, "Normal")
 
         //  Scene geometry - a trefoil knot.
         //let trefoilKnot = new TrefoilKnot()   
@@ -221,29 +228,23 @@ module TrefoilKnot =
         /// Initialises the Scene.
         /// </summary>
         /// <param name="gl">The OpenGL instance.</param>
-        member x.Initialise(gl) =
+        member x.Initialise(gl : OpenGL) =
         
             //  We're going to specify the attribute locations for the position and normal, 
             //  so that we can force both shaders to explicitly have the same locations.
-            let positionAttribute = 0u
-            let normalAttribute = 1u
-            let attributeLocations = new Dictionary<uint32, string>()
-            attributeLocations.Add (positionAttribute, "Position")
-            attributeLocations.Add (normalAttribute, "Normal")
 
-//            //  Create the per pixel shader.
-//            let shaderPerPixel = new ShaderProgram()
-//            do shaderPerPixel.Create(gl, 
-//                                     ManifestResourceLoader.LoadTextFile(@"CelShadingExample\Shaders\PerPixel.vert"), 
-//                                     ManifestResourceLoader.LoadTextFile(@"CelShadingExample\Shaders\PerPixel.frag"), 
-//                                     attributeLocations)
-//            
-//            //  Create the toon shader.
-//            let shaderToon = new ShaderProgram()
-//            do shaderToon.Create(gl,
-//                                 ManifestResourceLoader.LoadTextFile(@"CelShadingExample\Shaders\Toon.vert"),
-//                                 ManifestResourceLoader.LoadTextFile(@"CelShadingExample\Shaders\Toon.frag"), 
-//                                 attributeLocations)
+
+            //  Create the per pixel shader.
+            do shaderPerPixel.Create(gl, 
+                                     ManifestResourceLoader.LoadTextFile(@"CelShadingExample\Shaders\PerPixel.vert"), 
+                                     ManifestResourceLoader.LoadTextFile(@"CelShadingExample\Shaders\PerPixel.frag"), 
+                                     attributeLocations)
+            
+            // Create the toon shader.
+            do shaderToon.Create(gl,
+                                 ManifestResourceLoader.LoadTextFile(@"CelShadingExample\Shaders\Toon.vert"),
+                                 ManifestResourceLoader.LoadTextFile(@"CelShadingExample\Shaders\Toon.frag"), 
+                                 attributeLocations)
             
             //  Generate the geometry and it's buffers.
             do GenerateGeometry(gl, positionAttribute, normalAttribute)
@@ -306,14 +307,9 @@ module TrefoilKnot =
             //let vertices = trefoilKnot.Vertices;
             gl.Begin(BeginMode.Triangles)
             [|0 .. vertexCount-1|]// indices
-            |> Array.iter (fun x -> gl.Vertex(vertices.[x].x, 
-                                              vertices.[x].y, 
-                                              vertices.[x].z))
-
-            [|0 .. vertexCount-1|]// indices
-            |> Array.iter (fun x -> gl.Normal(normals.[x].x, 
-                                              normals.[x].y, 
-                                              normals.[x].z))
+            |> Array.iter (fun x -> 
+                gl.Vertex(vertices.[x].x, vertices.[x].y, vertices.[x].z)
+                gl.Normal(normals.[x].x, normals.[x].y, normals.[x].z))
             gl.End()
 
             //  Pop the attributes, restoring all polygon state.
@@ -325,42 +321,60 @@ module TrefoilKnot =
         /// </summary>
         /// <param name="gl">The OpenGL instance.</param>
         /// <param name="useToonShader">if set to <c>true</c> use the toon shader, otherwise use a per-pixel shader.</param>
-//        member x.RenderRetainedMode(gl : OpenGL, useToonShader) =
-//        
-//            //  Get a reference to the appropriate shader.
-//            let shader = if useToonShader then shaderToon else shaderPerPixel
-//
-//            //  Use the shader program.
-//            shader.Bind(gl)
-//
-//            //  Set the variables for the shader program.
-//            shader.SetUniform3(gl, "DiffuseMaterial", 0.f, 0.75f, 0.75f)
-//            shader.SetUniform3(gl, "AmbientMaterial", 0.04f, 0.04f, 0.04f)
-//            shader.SetUniform3(gl, "SpecularMaterial", 0.5f, 0.5f, 0.5f)
-//            shader.SetUniform1(gl, "Shininess", 50.f)
-//
-//            //  Set the light position.
-//            shader.SetUniform3(gl, "LightPosition", 0.25f, 0.25f, 1.f);
-//
-//            //  Set the matrices.
-//            shader.SetUniformMatrix4(gl, "Projection", projectionMatrix.to_array());
-//            shader.SetUniformMatrix4(gl, "Modelview", modelviewMatrix.to_array());
-//            shader.SetUniformMatrix3(gl, "NormalMatrix", normalMatrix.to_array());
-//
-//            //  Bind the vertex buffer array.
-//            vertexBufferArray.Bind(gl)
-//                        
-//            //  Draw the elements.
-//            gl.DrawElements(OpenGL.GL_TRIANGLES, indices.Length, OpenGL.GL_UNSIGNED_SHORT, IntPtr.Zero)
-//
-//            //  Unbind the shader.
-//            shader.Unbind(gl)
+        member x.RenderRetainedMode(gl : OpenGL, useToonShader) =
+        
+            
+            
+            //  Setup the modelview matrix.
+            gl.MatrixMode(OpenGL.GL_TRIANGLES)
+            gl.LoadIdentity()
+            gl.MultMatrix(modelviewMatrix.to_array())
+            
+            gl.Begin(BeginMode.Triangles)
+            [|0 .. vertexCount-1|]// indices
+            |> Array.iter (fun x -> 
+                gl.Vertex(vertices.[x].x, vertices.[x].y, vertices.[x].z)
+                gl.Normal(normals.[x].x, normals.[x].y, normals.[x].z))
+            gl.End()            
+            
+                        
+            GenerateGeometry(gl, positionAttribute, normalAttribute)
 
+
+            //  Get a reference to the appropriate shader.
+            let shader = if useToonShader then shaderToon else shaderPerPixel
+
+            //  Use the shader program.
+            shader.Bind(gl)
+
+            //  Set the variables for the shader program.
+            shader.SetUniform3(gl, "DiffuseMaterial", 0.f, 0.75f, 0.75f)
+            shader.SetUniform3(gl, "AmbientMaterial", 0.04f, 0.04f, 0.04f)
+            shader.SetUniform3(gl, "SpecularMaterial", 0.5f, 0.5f, 0.5f)
+            shader.SetUniform1(gl, "Shininess", 50.f)
+
+            //  Set the light position.
+            shader.SetUniform3(gl, "LightPosition", 0.25f, 0.25f, 1.f);
+
+            //  Set the matrices.
+            shader.SetUniformMatrix4(gl, "Projection", projectionMatrix.to_array());
+            shader.SetUniformMatrix4(gl, "Modelview", modelviewMatrix.to_array());
+            shader.SetUniformMatrix3(gl, "NormalMatrix", normalMatrix.to_array());
+
+            //  Bind the vertex buffer array.
+            vertexBufferArray.Bind(gl)
+                        
+            //  Draw the elements.
+            gl.DrawElements(OpenGL.GL_TRIANGLES, indices.Length, OpenGL.GL_UNSIGNED_SHORT, System.IntPtr(int indices.[0]))  
+
+            //  Unbind the shader.
+            shader.Unbind(gl)
+            //vertexBufferArray.Unbind(gl)
 
 module CelShadingExample =
     let mutable theta = 0.f
-    let mutable scene = new TrefoilKnot.Scene()
-    let mutable axies = new Axies()
+    let scene = new TrefoilKnot.Scene()
+    let axies = new Axies()
     
 
     let OpenGLControl_OpenGLDraw(sender:obj, args : OpenGLEventArgs) =
@@ -370,7 +384,7 @@ module CelShadingExample =
         //  Add a bit to theta (how much we're rotating the scene) and create the modelview
         //  and normal matrices.
   
-        theta <- 0.01f
+        theta <- theta + 0.01f
         scene.CreateModelviewAndNormalMatrix(theta)
             
         //  Clear the color and depth buffer.
@@ -379,9 +393,10 @@ module CelShadingExample =
             
         //  Render the scene in either immediate or retained mode.
         do 
-            //scene.RenderRetainedMode(gl, true)
-            axies.Render(gl, RenderMode.Render)
-            scene.RenderImmediateMode(gl)
+            //axies.Render(gl, RenderMode.Render)
+            //scene.RenderImmediateMode(gl)
+            scene.RenderRetainedMode(gl, false)
+
 //        match comboRenderMode.SelectedIndex with
 //        | 0 -> scene.RenderRetainedMode(gl, checkBoxUseToonShader.IsChecked.Value)
 //        | 1 ->
@@ -422,21 +437,32 @@ let w =
     |> fun x -> Path.Combine(System.Environment.GetEnvironmentVariable("PROJECTS"), x) 
     |> fun x -> loadXamlWindow(x)
 
+
 //<sharpGL:OpenGLControl x:Name="openGlCtrl"
 //OpenGLDraw="OpenGLControl_OpenGLDraw" OpenGLInitialized="OpenGLControl_OpenGLInitialized" 
 //RenderContextType="FBO" Resized="OpenGLControl_Resized" />
 
-let openGlCtrl =  w.FindName("openGlCtrl") :?> SharpGL.WPF.OpenGLControl
+let mutable openGlCtrl =  w.FindName("openGlCtrl") :?> SharpGL.WPF.OpenGLControl
 openGlCtrl.InitializeComponent()
-let gl = ref(openGlCtrl.OpenGL)
-gl := OpenGL()
-//CelShadingExample.scene.Initialise(!gl)
-openGlCtrl.OpenGLDraw.Add (fun x  -> CelShadingExample.OpenGLControl_OpenGLDraw(openGlCtrl,x) )
-openGlCtrl.OpenGLInitialized.Add (fun x ->  CelShadingExample.OpenGLControl_OpenGLInitialized(openGlCtrl,x) )
+
+
+let gl  = SharpGL.OpenGL()
+gl.Create(SharpGL.Version.OpenGLVersion.OpenGL3_1, SharpGL.RenderContextType.FBO, 800, 600, 32, System.IntPtr.Zero) |> printfn "%A"
+let glr = ref (openGlCtrl.OpenGL)
+glr := gl
+printfn "#0"
+CelShadingExample.scene.Initialise(gl)
+printfn "#1"
+openGlCtrl.OpenGLDraw.Add (fun x -> CelShadingExample.OpenGLControl_OpenGLDraw(gl,x) )
+printfn "#2"
+openGlCtrl.OpenGLInitialized.Add (fun x -> CelShadingExample.OpenGLControl_OpenGLInitialized(gl,x) )
+printfn "#3"
 openGlCtrl.RenderContextType <- RenderContextType.FBO
-openGlCtrl.Resized.Add (fun x -> CelShadingExample.OpenGLControl_Resized(openGlCtrl,x) )
+printfn "#4"
+openGlCtrl.Resized.Add (fun x -> CelShadingExample.OpenGLControl_Resized(gl,x) )
+printfn "#5"
 //openGlCtrl.Visibility <- Visibility.Visible
 
 
-w.Show()
 
+w.Show()
