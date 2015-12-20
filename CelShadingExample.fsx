@@ -1,7 +1,4 @@
 ﻿
-// Antonio Cisternino 
-// http://fssnip.net/H 
-
 #r "PresentationCore.dll";;
 #r "PresentationFramework.dll";;
 #r "System.Xaml.dll";;
@@ -20,6 +17,7 @@ open System
 open System.IO
 open System.Linq
 open System.Reflection
+open System.Text.RegularExpressions
 open System.Xml
 open System.Windows
 open System.Windows.Media
@@ -35,14 +33,12 @@ open SharpGL.VertexBuffers
 open SharpGL.WPF
 open GlmNet
 
-module ManifestResourceLoader =
-  
-    /// <summary>
-    /// Loads the named manifest resource as a text string.
-    /// </summary>
-    /// <param name="textFileName">Name of the text file.</param>
-    /// <returns>The contents of the manifest resource.</returns>
-    let LoadTextFile2(textFileName : string) =
+
+/// Extending SharpGL.Shaders.ShaderProgram
+module ShaderProgram =
+    
+    /// Loads the shader sourcecode from the named manifest resource.
+    let LoadManifestResource (textFileName : string) =
     
         let executingAssembly = Assembly.GetExecutingAssembly()
         let pathToDots = textFileName.Replace("\\", ".")
@@ -52,16 +48,16 @@ module ManifestResourceLoader =
         use reader = new StreamReader(stream)
         reader.ReadToEnd()
 
-    let LoadTextFile(textFileName : string) = 
-        File.ReadAllText(Path.Combine(__SOURCE_DIRECTORY__, textFileName))
+    /// Loads the shader sourcecode from the text file.
+    let LoadTextFile (textFileName : string) = 
+        if Regex(@"^(([a-zA-Z]:\\)|([a-zA-Z]://)|(//)).*").IsMatch(textFileName) then
+            File.ReadAllText(textFileName)
+        else
+            File.ReadAllText(Path.Combine(__SOURCE_DIRECTORY__, textFileName))
 
 
-//  Original Source: http://prideout.net/blog/?p=22
-
-/// <summary>
-/// The TrefoilKnot class creates geometry
-/// for a trefoil knot.
-/// </summary>
+/// The TrefoilKnot class creates geometry for a trefoil knot.
+/// Original Source: http://prideout.net/blog/?p=22
 module TrefoilKnot = 
     open SharpGL.SceneGraph.Shaders
     open System.Collections.Generic
@@ -69,7 +65,7 @@ module TrefoilKnot =
     open SharpGL.Enumerations
 
 
-    /// The number of slices and stacks.
+    // The number of slices and stacks.
     let slices = 128
     let stacks = 32
     let vertexCount = slices * stacks
@@ -236,14 +232,14 @@ module TrefoilKnot =
 
             //  Create the per pixel shader.
             do shaderPerPixel.Create(gl, 
-                                     ManifestResourceLoader.LoadTextFile(@"CelShadingExample\Shaders\PerPixel.vert"), 
-                                     ManifestResourceLoader.LoadTextFile(@"CelShadingExample\Shaders\PerPixel.frag"), 
+                                     ShaderProgram.LoadTextFile(@"CelShadingExample\Shaders\PerPixel.vert"), 
+                                     ShaderProgram.LoadTextFile(@"CelShadingExample\Shaders\PerPixel.frag"), 
                                      attributeLocations)
             
             // Create the toon shader.
             do shaderToon.Create(gl,
-                                 ManifestResourceLoader.LoadTextFile(@"CelShadingExample\Shaders\Toon.vert"),
-                                 ManifestResourceLoader.LoadTextFile(@"CelShadingExample\Shaders\Toon.frag"), 
+                                 ShaderProgram.LoadTextFile(@"CelShadingExample\Shaders\Toon.vert"),
+                                 ShaderProgram.LoadTextFile(@"CelShadingExample\Shaders\Toon.frag"), 
                                  attributeLocations)
             
             //  Generate the geometry and it's buffers.
@@ -370,6 +366,7 @@ module TrefoilKnot =
             //gl.UseProgram(shader.ShaderProgramObject)
             gl.DrawElements(OpenGL.GL_TRIANGLES, indices.Length, OpenGL.GL_UNSIGNED_SHORT, System.IntPtr(int indices.[0]))
             //gl.DrawArrays(OpenGL.GL_TRIANGLES, (int indices.[0]), indices.Length)
+            gl.Flush()
             //  Unbind the shader.
             shader.Unbind(gl)
             vertexBufferArray.Unbind(gl)

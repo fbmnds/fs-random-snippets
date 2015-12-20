@@ -1,0 +1,60 @@
+
+The trefoil knot can be defined as the curve obtained from the following parametric equations:
+
+x = \sin t + 2 \sin 2t
+
+\qquad y=\cos t - 2 \cos 2t
+
+\qquad z=-\sin 3t
+
+The (2,3)-torus knot is also a trefoil knot. The following parametric equations give a (2,3)-torus knot lying on torus (r-2)^2+z^2 = 1:
+
+x = (2+\cos 3t)\cos 2t
+
+\qquad y=(2+\cos 3t )\sin 2t
+
+\qquad z=\sin 3t
+
+
+q(u,v) :=  4 * arctan( (aa / w) * (sin(w * v)) / (cosh(aa * u)) );
+
+where:
+
+  w := sqrt( 1 - aa * aa);
+
+% Here is a more sophisticated and interesting example. 
+% It is the contents of a script M-File called ellipse.m
+% This file creates and plays a movie showing the osculating circles to an ellipse 
+% Lacra Bintu
+clear all
+close all 
+n=100; % the number of frames 
+Mellipse=moviein(n); % initializing the matrix that will contain the information for the movie
+a=1.6; % the value of the big axis of the ellipse 
+b=0.9; % the value of the big axis of the ellipse 
+t=[0:2*pi/n:2*pi]; % setting the values of t where we want to see the circles 
+x=a*cos(t); % finding the x coordinate from the parametric equation of an ellipse 
+y=b*sin(t); % finding the y coordinate from the parametric equation of an ellipse
+k=a*b./(a^2.*sin(t).^2+b^2*cos(t).^2).^(3/2); % the curvature of the ellipse at the chosen t values 
+r=1./k; % the radii of the osculating circles at each chosen value of t
+xo=x-b*r.*cos(t)./((b^2)*cos(t).^2+a^2*sin(t).^2).^(1/2); % the x cordinate of the centers of the circles 
+yo=y-a*r.*sin(t)./((b^2)*cos(t).^2+a^2*sin(t).^2).^(1/2); % the y cordinate of the centers of the circles
+m=2*max(r)-min([a,b]); % calculating about how big we want the axes of our figures to be 
+for i=1:n+1
+xc=xo(i)+r(i)*cos(t); % finding all the x coordinates necessary to draw the osculating 
+% circle at the point i*2pi/n 
+yc=yo(i)+r(i)*sin(t); % finding all the x coordinates necessary to draw the osculating 
+% circle at the point i*2pi/n
+figure(1) 
+plot(x,y, ’k’) % draw the ellipse
+hold on % keep the figure from being erased 
+plot(xc,yc,’r’) % draw the osculating circle at at the point i*2pi/n 
+plot(xo(1:i),yo(1:i)) % draw all the centers of the circles up to that point 
+plot([xo(i),x(i)], [yo(i),y(i)], ’r--’) % draw the normal to the ellipse 
+hold off % allow the figure to be erased 
+axis([-m m -m m]) % set the axis to some appropriate value 
+Mellipse(:,i)=getframe; % put the information from the resulting figure 
+% as a column in the movie matrix 
+end 
+movie(Mellipse) 
+% play the movie
