@@ -3,6 +3,7 @@
 #r "PresentationFramework.dll";;
 #r "System.Xaml.dll";;
 #r "WindowsBase.dll";;
+#r "UIAutomationTypes";;
 
 
 #r @"SharpGL.WPF.2.4.0.0\SharpGL.dll"

@@ -1,0 +1,19 @@
+﻿<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <UserControl.Resources>
+    <ImageBrush x:Key="MeshBrush"            
+      Stretch="Fill" />
+  </UserControl.Resources>
+  <DockPanel Background="Black">
+    <StackPanel Orientation="Vertical"
+        Background="LightGray"
+        Margin="10"
+        Width="150">
+        <RadioButton IsChecked="True">Plane</RadioButton>
+        <RadioButton>Cone</RadioButton>
+        <RadioButton>Cylinder</RadioButton>
+        <RadioButton>Sphere</RadioButton>
+    </StackPanel>
+    <Image x:Name="world"/>
+  </DockPanel>
+</UserControl>

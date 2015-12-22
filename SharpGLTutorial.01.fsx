@@ -3,6 +3,7 @@
 #r "PresentationFramework.dll";;
 #r "System.Xaml.dll";;
 #r "WindowsBase.dll";;
+#r "UIAutomationTypes";;
 
 
 #r @"SharpGL.WPF.2.4.0.0\SharpGL.dll"
@@ -57,26 +58,7 @@ module ShaderProgram =
         else
             File.ReadAllText(Path.Combine(__SOURCE_DIRECTORY__, textFileName))
 
-    let CreateShader ((gl : OpenGL), shaderType, shaderCode) =
-        let shader = gl.CreateShader (shaderType)
-        printfn "GetShaderInfoLog 0"
-        try
-            gl.ShaderSource (shader, !ref(shaderCode))
-        with | ex -> ex.Message |> printfn "GetShaderInfoLog 0.1 %s"
-        try
-            gl.CompileShader (shader)
-        with | ex -> ex.Message |> printfn "GetShaderInfoLog 1 %s"
-
-        let infoLog = Text.StringBuilder()
-        let length = [|for i in [0..99] do yield "0"|]
-        try 
-            gl.GetShaderInfoLog (shader, 100, IntPtr(int length.[0]), infoLog)
-        with | ex -> ex.Message |> printfn "GetShaderInfoLog 2 %s"
-        length |> printfn "GetShaderInfoLog 3 %A" 
-
-        shader
-
-
+    
 
 module Main = 
     let vertices =
@@ -95,14 +77,12 @@ module Main =
               System.IntPtr.Zero) |> printfn "gl.Create %b"
 
     let vertexShaderCode =
-        """
-#version 310
-layout(location = 0) in vec4 Position;
-void main()
-{
-	gl_Position = Position;
-}
-"""
+        [| "#version 310"
+           "layout(location = 0) in vec4 Position;"
+           "void main()"
+           "{"
+           "	gl_Position = Position;"
+           "}" |] |> Array.reduce (fun x y -> sprintf "%s\n%s" x y) 
 
     let fragmentShaderCode =
         """
@@ -113,7 +93,6 @@ void main()
 	outputColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);
 }
 """
-    let shader = ShaderProgram.CreateShader(gl,OpenGL.GL_VERTEX_SHADER,vertexShaderCode)
 
     let attributeLocations = new Dictionary<uint32, string>()
     let positionAttribute = 0u
@@ -161,8 +140,6 @@ void main()
     let CheckBox_Selected (sender : obj, x : EventArgs) = ()
 
     let Run () =
-        
-        Init()
 
         let app = new Application()
 
@@ -199,8 +176,9 @@ void main()
         printfn "#5"
         openGlCtrl.Visibility <- Visibility.Visible
         printfn "#6"
+        Display()
 
         w.Show()
-        Display()
+        
 
 Main.Run()
