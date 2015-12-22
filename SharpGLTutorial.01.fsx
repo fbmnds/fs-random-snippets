@@ -57,7 +57,6 @@ module ShaderProgram =
             File.ReadAllText(textFileName)
         else
             File.ReadAllText(Path.Combine(__SOURCE_DIRECTORY__, textFileName))
-
     
 
 module Main = 
@@ -71,18 +70,24 @@ module Main =
     let vao = [|0u|]
     
     let gl = OpenGL()
-    gl.Create(SharpGL.Version.OpenGLVersion.OpenGL3_1, 
-              SharpGL.RenderContextType.FBO, 
-              800, 600, 32, 
-              System.IntPtr.Zero) |> printfn "gl.Create %b"
+    if not (gl.Create(SharpGL.Version.OpenGLVersion.OpenGL2_0, 
+                      SharpGL.RenderContextType.FBO, 
+                      800, 600, 32, 
+                      System.IntPtr.Zero)) then
+        failwith "gl.Create SharpGL.Version.OpenGLVersion.OpenGL3_1"
 
+    let toString s = s |> Array.reduce (fun x y -> sprintf "%s\n%s" x y) 
+
+#if DEBUG
     let vertexShaderCode =
-        [| "#version 310"
-           "layout(location = 0) in vec4 Position;"
-           "void main()"
-           "{"
-           "	gl_Position = Position;"
-           "}" |] |> Array.reduce (fun x y -> sprintf "%s\n%s" x y) 
+        """
+#version 310
+layout(location = 0) in vec4 Position;
+void main()
+{
+	gl_Position = Position;
+}
+"""
 
     let fragmentShaderCode =
         """
@@ -93,6 +98,23 @@ void main()
 	outputColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);
 }
 """
+#else    
+    let vertexShaderCode =
+        [| "#version 110"
+           "vec4 Position;"
+           "void main()"
+           "{"
+           "    gl_Position = Position;"
+           "}" |] |> toString
+
+    let fragmentShaderCode =
+        [| "#version 110"
+           "vec4 outputColor;"
+           "void main()"
+           "{"
+           "    outputColor = vec4(0.1,0.2,0.3,0.4);"
+           "}" |] |> toString 
+#endif
 
     let attributeLocations = new Dictionary<uint32, string>()
     let positionAttribute = 0u
@@ -100,9 +122,33 @@ void main()
     let indexAttribute = 2u        
     attributeLocations.Add (positionAttribute, "Position")
     attributeLocations.Add (normalAttribute, "Normal")
-    //attributeLocations.Add (indexAttribute, "Index")
+    attributeLocations.Add (indexAttribute, "outputColor")
 
     let shaderProgram = ShaderProgram()
+    shaderProgram.Bind(gl)
+    attributeLocations.AsEnumerable()
+    |> Seq.iter (fun x -> shaderProgram.BindAttributeLocation(gl, x.Key, x.Value))
+    
+
+#if DEBUG
+    let shader gl shaderSource = 
+        let shader = Shaders.VertexShader()
+        shader.CreateInContext(gl)
+        shader.SetSource(shaderSource)
+        shader.Compile()
+        if not (shader.CompileStatus.HasValue) then 
+            failwith (sprintf "failed with source:\n %s" shaderSource)
+        if not (shader.CompileStatus.Value) then
+            failwith (sprintf "failed with source:\n%s\ninfoLog:\%s" shaderSource shader.InfoLog)
+        shader
+
+    let pixelVertexShader = shader gl vertexShaderCode
+    let pixelFragmentShader = shader gl fragmentShaderCode
+
+    pixelVertexShader.IsEnabled <- true
+    pixelFragmentShader.IsEnabled <- true
+#endif
+
     shaderProgram.Create(gl, vertexShaderCode, fragmentShaderCode, attributeLocations)
 
     /// Called after the window and OpenGL are initialized. Called exactly once, before the main loop.
@@ -117,7 +163,7 @@ void main()
         gl.BindVertexArray(vao.[0])
 
     let Display () =
-        gl.ClearColor(0.0f, 0.0f, 0.0f, 0.0f)
+        gl.ClearColor(0.0f, 0.0f, 0.0f, 1.0f)
         gl.Clear(OpenGL.GL_COLOR_BUFFER_BIT)
 
         gl.UseProgram(shaderProgram.ShaderProgramObject)
@@ -127,10 +173,10 @@ void main()
         gl.VertexAttribPointer(0u, 4, OpenGL.GL_FLOAT, OpenGL.GL_FALSE>0u, 0, IntPtr(0))
 
         gl.DrawArrays(OpenGL.GL_TRIANGLES, 0, 3)
-
-        gl.DisableVertexAttribArray(0u)
-        gl.UseProgram(0u)
         gl.Flush()
+//        gl.DisableVertexAttribArray(0u)
+//        gl.UseProgram(0u)
+//        shaderProgram.Unbind(gl)
        
     let loadXamlWindow (filename:string) =
         let reader = XmlReader.Create(filename)
@@ -178,7 +224,7 @@ void main()
         printfn "#6"
         Display()
 
-        w.Show()
+        w |> app.Run |> ignore
         
 
 Main.Run()
