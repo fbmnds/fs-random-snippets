@@ -1,0 +1,638 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Simple.Wpf.FSharp.Repl</name>
+    </assembly>
+    <members>
+        <member name="T:Simple.Wpf.FSharp.Repl.UI.LineColorConverter">
+            <summary>
+            Line color converter used with Simple.Wpf.Terminal control.
+            </summary>
+        </member>
+        <member name="F:Simple.Wpf.FSharp.Repl.UI.LineColorConverter.NormalProperty">
+            <summary>
+            Dependency property for the Normal line color.
+            </summary>
+        </member>
+        <member name="F:Simple.Wpf.FSharp.Repl.UI.LineColorConverter.ErrorProperty">
+            <summary>
+            Dependency property for the Error line color.
+            </summary>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.UI.LineColorConverter.#ctor">
+            <summary>
+            Default constructor.
+            </summary>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.UI.LineColorConverter.Convert(System.Object,System.Type,System.Object,System.Globalization.CultureInfo)">
+            <summary>
+            Converts the line to a specific color.
+            </summary>
+            <param name="value"></param>
+            <param name="targetType"></param>
+            <param name="parameter"></param>
+            <param name="culture"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.UI.LineColorConverter.ConvertBack(System.Object,System.Type,System.Object,System.Globalization.CultureInfo)">
+            <summary>
+            Does nothing.
+            </summary>
+            <param name="value"></param>
+            <param name="targetType"></param>
+            <param name="parameter"></param>
+            <param name="culture"></param>
+            <returns></returns>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.UI.LineColorConverter.Normal">
+            <summary>
+            Normal line color property.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.UI.LineColorConverter.Error">
+            <summary>
+            Error line color property.
+            </summary>
+        </member>
+        <member name="T:Simple.Wpf.FSharp.Repl.Services.IProcess">
+            <summary>
+            Wraps the .Net System.Diagnostics.Process class.
+            </summary>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Services.IProcess.Start">
+            <summary>
+            Start the .Net process.
+            </summary>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Services.IProcess.WaitForExit">
+            <summary>
+            Waits for the .Net process to exit.
+            </summary>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Services.IProcess.WriteStandardInput(System.String)">
+            <summary>
+            Writes to the input stream of the .Net process.
+            </summary>
+            <param name="line">The line to written to the input stream.</param>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Services.IProcess.StandardOutputReadAsync(System.Threading.CancellationToken)">
+            <summary>
+            Reads the output stream of the .Net process asynchronuously.
+            </summary>
+            <param name="cancellationToken">The task cancellation token.</param>
+            <returns>Returns the asynchronously read ouput.</returns>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Services.IProcess.StandardErrorReadAsync(System.Threading.CancellationToken)">
+            <summary>
+            Reads the error stream of the .Net process asynchronuously.
+            </summary>
+            <param name="cancellationToken">The task cancellation token.</param>
+            <returns>Returns the asynchronously read error.</returns>
+        </member>
+        <member name="T:Simple.Wpf.FSharp.Repl.Services.Process">
+            <summary>
+            Wraps the .Net System.Diagnostics.Process class.
+            </summary>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Services.Process.#ctor(System.Diagnostics.Process)">
+            <summary>
+            Creates a wrapper around an instance of the .Net System.Diagnostics.Process class.
+            </summary>
+            <param name="process">The System.Diagnostics.Process instance.</param>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Services.Process.Dispose">
+            <summary>
+            Disposes the System.Diagnostics.Process instance.
+            </summary>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Services.Process.Start">
+            <summary>
+            Start the .Net process.
+            </summary>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Services.Process.WaitForExit">
+            <summary>
+            Waits for the .Net process to exit.
+            </summary>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Services.Process.WriteStandardInput(System.String)">
+            <summary>
+            Writes to the input stream of the .Net process.
+            </summary>
+            <param name="line">The line to written to the input stream.</param>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Services.Process.StandardOutputReadAsync(System.Threading.CancellationToken)">
+            <summary>
+            Reads the output stream of the .Net process asynchronuously.
+            </summary>
+            <param name="cancellationToken">The task cancellation token.</param>
+            <returns>Returns the asynchronously read output.</returns>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Services.Process.StandardErrorReadAsync(System.Threading.CancellationToken)">
+            <summary>
+            Reads the error stream of the .Net process asynchronuously.
+            </summary>
+            <param name="cancellationToken">The task cancellation token.</param>
+            <returns>Returns the asynchronously read error.</returns>
+        </member>
+        <member name="T:Simple.Wpf.FSharp.Repl.Core.IReplEngine">
+            <summary>
+            Interface for the wrapper around the F# Interactive process.
+            </summary>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Core.IReplEngine.Start(System.String)">
+            <summary>
+            Starts the REPL engine.
+            </summary>
+            <param name="script">The script to run at startup.</param>
+            <returns>Returns the REPL engine.</returns>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Core.IReplEngine.Stop">
+            <summary>
+            Stops the REPL engine.
+            </summary>
+            <returns>Returns the REPL engine.</returns>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Core.IReplEngine.Reset">
+            <summary>
+            Reset the REPL engine, if it has already been started.
+            </summary>
+            <returns>Returns the REPL engine.</returns>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Core.IReplEngine.Execute(System.String)">
+            <summary>
+            Executes a scripts, if the REPL engine has been started.
+            </summary>
+            <param name="script">The script to be executed.</param>
+            <returns>Returns the REPL engine.</returns>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.Core.IReplEngine.State">
+            <summary>
+            REPL engine state changes as a Reactive extensions stream.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.Core.IReplEngine.Error">
+            <summary>
+            REPL engine errors as a Reactive extensions stream.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.Core.IReplEngine.Output">
+            <summary>
+            REPL engine output as a Reactive extensions stream.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.Core.IReplEngine.WorkingDirectory">
+            <summary>
+            REPL engine working directory.
+            </summary>
+        </member>
+        <member name="T:Simple.Wpf.FSharp.Repl.UI.Controllers.IReplEngineController">
+            <summary>
+            Controller for the REPL engine, exposes the ViewModel.
+            </summary>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.UI.Controllers.IReplEngineController.Execute(System.String)">
+            <summary>
+            Execute the script
+            </summary>
+            <param name="script">The script to execute.</param>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.UI.Controllers.IReplEngineController.ViewModel">
+            <summary>
+            The ViewModel for the REPL engine.
+            </summary>
+        </member>
+        <member name="T:Simple.Wpf.FSharp.Repl.Properties.Resources">
+            <summary>
+              A strongly-typed resource class, for looking up localized strings, etc.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.Properties.Resources.ResourceManager">
+            <summary>
+              Returns the cached ResourceManager instance used by this class.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.Properties.Resources.Culture">
+            <summary>
+              Overrides the current thread's CurrentUICulture property for all
+              resource lookups using this strongly typed resource class.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.Properties.Resources.FSharp">
+            <summary>
+              Looks up a localized resource of type System.Byte[].
+            </summary>
+        </member>
+        <member name="T:Simple.Wpf.FSharp.Repl.Core.State">
+            <summary>
+            REPL engine state.
+            </summary>
+        </member>
+        <member name="F:Simple.Wpf.FSharp.Repl.Core.State.Unknown">
+            <summary>
+            REPL engine is in an unknown state.
+            </summary>
+        </member>
+        <member name="F:Simple.Wpf.FSharp.Repl.Core.State.Faulted">
+            <summary>
+            REPL engine has errored and entered a faulted state.
+            </summary>
+        </member>
+        <member name="F:Simple.Wpf.FSharp.Repl.Core.State.Starting">
+            <summary>
+            REPL engine is starting up.
+            </summary>
+        </member>
+        <member name="F:Simple.Wpf.FSharp.Repl.Core.State.Running">
+            <summary>
+            REPL engine is running and waiting to execute a script.
+            </summary>
+        </member>
+        <member name="F:Simple.Wpf.FSharp.Repl.Core.State.Stopping">
+            <summary>
+            REPL engine is stopping.
+            </summary>
+        </member>
+        <member name="F:Simple.Wpf.FSharp.Repl.Core.State.Stopped">
+            <summary>
+            REPL engine has stopped.
+            </summary>
+        </member>
+        <member name="F:Simple.Wpf.FSharp.Repl.Core.State.Executing">
+            <summary>
+            REPL engine is executing a script.
+            </summary>
+        </member>
+        <member name="T:Simple.Wpf.FSharp.Repl.Services.ProcessService">
+            <summary>
+            Service starting .Net System.Diagnostics.Process instances for F# REPL engine &amp; Windows Explorer.
+            </summary>
+        </member>
+        <member name="T:Simple.Wpf.FSharp.Repl.Services.IProcessService">
+            <summary>
+            Service starting .Net System.Diagnostics.Process instances for F# REPL engine &amp; Windows Explorer.
+            </summary>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Services.IProcessService.StartWindowsExplorer(System.String)">
+            <summary>
+            Starts an instance of Windows Explorer at the directory specified.
+            </summary>
+            <param name="directory">The directory to open.</param>
+            <returns>The started process.</returns>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Services.IProcessService.StartReplExecutable(System.String,System.String)">
+            <summary>
+            Start the F# REPL process.
+            </summary>
+            <param name="workingDirectory">The working directory for the F# REPL process.</param>
+            <param name="executableDirectory">The executable path for the F# REPL process.</param>
+            <returns>The started F# REPL process.</returns>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Services.ProcessService.StartWindowsExplorer(System.String)">
+            <summary>
+            Start an instance of Windows Explorer at the directory specified.
+            </summary>
+            <param name="directory">The directory to open.</param>
+            <returns>The started process.</returns>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Services.ProcessService.StartReplExecutable(System.String,System.String)">
+            <summary>
+            Start the F# REPL process.
+            </summary>
+            <param name="workingDirectory">The working directory for the F# REPL process.</param>
+            <param name="executableDirectory">The executable path for the F# REPL process.</param>
+            <returns>The started F# REPL process.</returns>
+        </member>
+        <member name="T:Simple.Wpf.FSharp.Repl.UI.ViewModels.BaseViewModel">
+            <summary>
+            Abstract base view model.
+            </summary>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.UI.ViewModels.BaseViewModel.OnPropertyChanged(System.String)">
+            <summary>
+            
+            </summary>
+            <param name="propertyName">The name of the property that has changed.</param>
+        </member>
+        <member name="E:Simple.Wpf.FSharp.Repl.UI.ViewModels.BaseViewModel.PropertyChanged">
+            <summary>
+            Property changed event.
+            </summary>
+        </member>
+        <member name="T:Simple.Wpf.FSharp.Repl.UI.ViewModels.IReplEngineViewModel">
+            <summary>
+            ViewModel for the REPL engine
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.UI.ViewModels.IReplEngineViewModel.WorkingDirectory">
+            <summary>
+            The REPL engine working directory.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.UI.ViewModels.IReplEngineViewModel.Reset">
+            <summary>
+            Reset requests as a Reactive extensions stream, this is consumed by the controller.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.UI.ViewModels.IReplEngineViewModel.Execute">
+            <summary>
+            Execution requests as a Reactive extensions stream, this is consumed by the controller.
+            </summary>
+        </member>
+        <member name="T:Simple.Wpf.FSharp.Repl.Core.ReplEngine">
+            <summary>
+            Wrapper around the F# Interactive process.
+            </summary>
+        </member>
+        <member name="F:Simple.Wpf.FSharp.Repl.Core.ReplEngine.QuitLine">
+            <summary>
+            REPL engine quit line for the F# Interactive process.
+            </summary>
+        </member>
+        <member name="F:Simple.Wpf.FSharp.Repl.Core.ReplEngine.LineTermination">
+            <summary>
+            REPL engine line termination characters.
+            </summary>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Core.ReplEngine.#ctor(System.String,Simple.Wpf.FSharp.Repl.Services.IProcessService,System.Reactive.Concurrency.IScheduler,System.Boolean)">
+            <summary>
+            Creates an instance of the REPL engine with the specified parameters.
+            </summary>
+            <param name="workingDirectory">The working directory for the F# Interactive process.</param>
+            <param name="processService">Handles creating windows processes.</param>
+            <param name="scheduler">The Reactive scheduler for the REPL engine, defaults to the task pool scheduler.</param>
+            <param name="anyCpu">Flag indicating whether to run as 32bit (false) or to determine at runtime (true).</param>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Core.ReplEngine.Start(System.String)">
+            <summary>
+            Starts the REPL engine.
+            </summary>
+            <param name="script">The script to run at startup.</param>
+            <returns>Returns the REPL engine.</returns>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Core.ReplEngine.Stop">
+            <summary>
+            Stops the REPL engine.
+            </summary>
+            <returns>Returns the REPL engine.</returns>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Core.ReplEngine.Reset">
+            <summary>
+            Reset the REPL engine, if it has already been started.
+            </summary>
+            <returns>Returns the REPL engine.</returns>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Core.ReplEngine.Execute(System.String)">
+            <summary>
+            Executes a scripts, if the REPL engine has been started.
+            </summary>
+            <param name="script">The script to be executed.</param>
+            <returns>Returns the REPL engine.</returns>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.Core.ReplEngine.Dispose">
+            <summary>
+            Disposes the REPL engine, if it's been started then it will be stopped.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.Core.ReplEngine.Output">
+            <summary>
+            REPL engine output as a Reactive extensions stream.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.Core.ReplEngine.Error">
+            <summary>
+            REPL engine errors as a Reactive extensions stream.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.Core.ReplEngine.State">
+            <summary>
+            REPL engine state changes as a Reactive extensions stream.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.Core.ReplEngine.WorkingDirectory">
+            <summary>
+            REPL engine working directory as a Reactive extensions stream.
+            </summary>
+        </member>
+        <member name="T:Simple.Wpf.FSharp.Repl.UI.ViewModels.ReplLineViewModel">
+            <summary>
+            REPL engine line output.
+            </summary>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.UI.ViewModels.ReplLineViewModel.#ctor(System.String,System.Boolean)">
+            <summary>
+            Creates a line ViewModel.
+            </summary>
+            <param name="value">The value of the output line.</param>
+            <param name="isError">Is the output line an error, default is false.</param>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.UI.ViewModels.ReplLineViewModel.Value">
+            <summary>
+            The value of line output.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.UI.ViewModels.ReplLineViewModel.IsError">
+            <summary>
+            Is the output line an error.
+            </summary>
+        </member>
+        <member name="T:Simple.Wpf.FSharp.Repl.UI.ReplWindow">
+            <summary>
+            REPL engine window containing the REPL engine UI.
+            </summary>
+            <summary>
+            ReplWindow
+            </summary>
+        </member>
+        <member name="F:Simple.Wpf.FSharp.Repl.UI.ReplWindow.StartUpScriptProperty">
+            <summary>
+            Optional startup script dependency property, used when the REPL engine starts.
+            </summary>
+        </member>
+        <member name="F:Simple.Wpf.FSharp.Repl.UI.ReplWindow.WorkingDirectoryProperty">
+            <summary>
+            The working directory dependency property, used when the REPL engine starts.
+            </summary>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.UI.ReplWindow.#ctor">
+            <summary>
+            Creates an instance of the Repl window user control.
+            </summary>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.UI.ReplWindow.ExecuteScript(System.String)">
+            <summary>
+            Execute a script with the REPL engine.
+            </summary>
+            <param name="script">The script to execute.</param>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.UI.ReplWindow.InitializeComponent">
+            <summary>
+            InitializeComponent
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.UI.ReplWindow.StartUpScript">
+            <summary>
+            The startup script property.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.UI.ReplWindow.WorkingDirectory">
+            <summary>
+            The current working directory property.
+            </summary>
+        </member>
+        <member name="T:Simple.Wpf.FSharp.Repl.UI.ReplEngine">
+            <summary>
+            REPL engine UI.
+            </summary>
+            <summary>
+            ReplEngine
+            </summary>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.UI.ReplEngine.#ctor">
+            <summary>
+            Creates an instance of the user control for the REPL engine.
+            </summary>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.UI.ReplEngine.InitializeComponent">
+            <summary>
+            InitializeComponent
+            </summary>
+        </member>
+        <member name="T:Simple.Wpf.FSharp.Repl.UI.Controllers.ReplEngineController">
+            <summary>
+            Controller for the REPL engine UI, exposes the ViewModel.
+            </summary>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.UI.Controllers.ReplEngineController.#ctor(System.String,System.String)">
+            <summary>
+            Creates an instance of the controller.
+            </summary>
+            <param name="startupScript">The script to run at startup, default is null.</param>
+            <param name="workingDirectory">The working directory, default is null.</param>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.UI.Controllers.ReplEngineController.#ctor(System.String)">
+            <summary>
+            Creates an instance of the controller.
+            </summary>
+            <param name="startupScript">The script to run at startup, default is null.</param>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.UI.Controllers.ReplEngineController.#ctor(System.String,System.String,Simple.Wpf.FSharp.Repl.Core.IReplEngine,Simple.Wpf.FSharp.Repl.Services.IProcessService,System.Reactive.Concurrency.IScheduler,System.Reactive.Concurrency.IScheduler)">
+            <summary>
+            Creates an instance of the controller.
+            </summary>
+            <param name="startupScript">The script to run at startup, default is null.</param>
+            <param name="workingDirectory">The working directory, default is null.</param>
+            <param name="replEngine">The REPL engine.</param>
+            <param name="processService">Service for starting windows processes.</param>
+            <param name="dispatcherScheduler">The Reactive extensions shceduler for the UI thread (dispatcher).</param>
+            <param name="taskScheduler">The Reactive extensiosn scheduler for the task pool scheduler.</param>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.UI.Controllers.ReplEngineController.Execute(System.String)">
+            <summary>
+            Execute the script
+            </summary>
+            <param name="script">The script to execute.</param>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.UI.Controllers.ReplEngineController.Dispose">
+            <summary>
+            Disposes the controller.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.UI.Controllers.ReplEngineController.ViewModel">
+            <summary>
+            The ViewModel for the REPL engine.
+            </summary>
+        </member>
+        <member name="T:Simple.Wpf.FSharp.Repl.UI.ViewModels.ReplEngineViewModel">
+            <summary>
+            ViewModel for the REPL engine.
+            </summary>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.UI.ViewModels.ReplEngineViewModel.#ctor(System.IObservable{Simple.Wpf.FSharp.Repl.Core.State},System.IObservable{Simple.Wpf.FSharp.Repl.UI.ViewModels.ReplLineViewModel},System.IObservable{Simple.Wpf.FSharp.Repl.UI.ViewModels.ReplLineViewModel},System.String,Simple.Wpf.FSharp.Repl.Services.IProcessService)">
+            <summary>
+            Creates an instance of the REPL engine ViewModel.
+            </summary>
+            <param name="replState">Reactive extensions stream of the REPL engine state.</param>
+            <param name="replOutput">Reactive extensions stream of the REPL engine output.</param>
+            <param name="replError">Reactive extensions stream of the REPL engine errors.</param>
+            <param name="workingDirectory">Reactive extensions stream of the REPL engine working directory.</param>
+            <param name="processService">Handles starting windows processes.</param>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.UI.ViewModels.ReplEngineViewModel.Dispose">
+            <summary>
+            Disposes the ViewModel.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.UI.ViewModels.ReplEngineViewModel.Prompt">
+            <summary>
+            The REPL engine prompt.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.UI.ViewModels.ReplEngineViewModel.State">
+            <summary>
+            The REPL engine state.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.UI.ViewModels.ReplEngineViewModel.WorkingDirectory">
+            <summary>
+            The REPL engine working directory.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.UI.ViewModels.ReplEngineViewModel.Reset">
+            <summary>
+            Reset requests as a Reactive extensions stream, this is consumed by the controller.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.UI.ViewModels.ReplEngineViewModel.Execute">
+            <summary>
+            Execution requests as a Reactive extensions stream, this is consumed by the controller.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.UI.ViewModels.ReplEngineViewModel.Output">
+            <summary>
+            The aggregated output from the REPL engine.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.UI.ViewModels.ReplEngineViewModel.ClearCommand">
+            <summary>
+            Clear the output command.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.UI.ViewModels.ReplEngineViewModel.ResetCommand">
+            <summary>
+            Reset the REPL engine commnad.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.UI.ViewModels.ReplEngineViewModel.ExecuteCommand">
+            <summary>
+            Executes the REPL engine commnad.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.UI.ViewModels.ReplEngineViewModel.OpenWorkingFolderCommand">
+            <summary>
+            Opens the working folder.
+            </summary>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.UI.ViewModels.ReplEngineViewModel.IsReadOnly">
+            <summary>
+            Is the REPL engine UI in read only mode.
+            </summary>
+        </member>
+        <member name="T:Simple.Wpf.FSharp.Repl.UI.LineEventArgs">
+            <summary>
+            REPL engine line event.
+            </summary>
+        </member>
+        <member name="M:Simple.Wpf.FSharp.Repl.UI.LineEventArgs.#ctor(System.String)">
+            <summary>
+            Constructor for REPL engine line event args.
+            </summary>
+            <param name="line">The REPL engine line.</param>
+        </member>
+        <member name="P:Simple.Wpf.FSharp.Repl.UI.LineEventArgs.Line">
+            <summary>
+            The line output by the REPL engine.
+            </summary>
+        </member>
+    </members>
+</doc>
